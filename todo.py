@@ -22,7 +22,7 @@ shiftright = [402, 400]
 def defineStorage():
     if system() == "Windows":
         import getpass
-        confFolder = 'C:\\Users\\' + getpass.getuser() + '\\todoList\\'
+        confFolder = 'C:\\Users\\' + getpass.getuser() + '\\todo\\'
         storage = confFolder + "storage.json"
     elif system() == "Linux" or system() == "Darwin":
         try:
@@ -30,7 +30,7 @@ def defineStorage():
         except:
             print(err + "Could not find home folder")
             exit()
-        confFolder = home + ".config/todo/"
+        confFolder = home + ".todo/"
         storage = confFolder + "storage.json"
     else:
         print("can't recognize OS, edit script to fit")

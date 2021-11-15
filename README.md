@@ -8,4 +8,8 @@ Written in python, uses json to store and work with the data
 
 ### Locations
 
-storage in `~/config/todo/`
+storage in `~/.todo/`
+
+### Make symlink
+
+`$ sudo ln -s {INSTALL_LOCATION}/todo.py /bin/todo`
