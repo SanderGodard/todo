@@ -11,13 +11,16 @@ ywinscroll = 0
 xwinscroll = 0
 
 # Keybinds
-backspace = [c.KEY_BACKSPACE, 8, 263, 127]
+backspace = [8, 127] # utenom ctrl+backspace (263) og c.KEY_BACKSPACE
 delete = [330, 383]
-enter = [c.KEY_ENTER, 10, 13]
+enter = [c.KEY_ENTER, 10, 13, 15] # ctrl+o (15)
+escape = [27, 24] # ctrl+x (24)
 shiftup = [337, 547]
 shiftdown = [336, 548]
 shiftleft = [393, 391]
 shiftright = [402, 400]
+ctrlleft = [546, 544]
+ctrlright = [561, 559]
 
 def defineStorage():
     if system() == "Windows":
@@ -134,6 +137,7 @@ def alert(stdscr, text):
 
     #text = "Escape: cancel      Enter: save changes"
     text = text[xwinscroll:stdscr.getmaxyx()[1]+xwinscroll-1]
+    text = text + " "*int(stdscr.getmaxyx()[1] - len(text))
     if len(text) < 1:
         text = " "
     wr(stdscr, text, stdscr.getmaxyx()[0]-1, "force")
@@ -242,10 +246,10 @@ def winrefresh(stdscr, data, direction="none", y=0):
 def wr(stdscr, text, row, flair="", focus=False):
     h, w = stdscr.getmaxyx()
     if not row >= h-1 or flair == "force":
-        if flair == "" and w <= len(text):
-            text = text[:w-1]
-        elif not flair == "" and w <= len(text)+4:
+        if not flair in ["", "force"]:
             text = text[:w-5]
+        else:
+            text = text[:w-1]
 
         if flair == "prompt":
             prompt = "[_] "
@@ -345,7 +349,7 @@ def readData(stdscr, storage):
             fulldata = json.load(file)
             # debu(stdscr, str(fulldata))
         except:
-            debu(stdscr, "Try deleting ~/.config/todo/storage.json, it may be corrupt")
+            debu(stdscr, "Try deleting ~/.todo/storage.json, it may be corrupt")
             exit()
 
     if len(str(fulldata)) == 0:
@@ -521,20 +525,25 @@ def flipTask(stdscr, data, pos):
     # wr(stdscr, str(type(taskFlair)) + ": " + taskFlair, stdscr.getmaxyx()[0]-1, "force")
     # stdscr.refresh()
     # stdscr.getch()
-    if taskFlair == "suc":
-        taskFlair = "err"
-    elif taskFlair == "err":
-        taskFlair = "gen"
-    elif taskFlair == "gen":
-        taskFlair = "tsk"
-    elif taskFlair == "tsk":
-        taskFlair = "suc"
+    taskorder = ["tsk", "suc", "err", "gen"]
+    if not taskFlair in taskorder:
+        newTaskFlair = "tsk"
     else:
-        taskFlair = "tsk"
+        newTaskFlair = taskorder[(taskorder.index(taskFlair) + 1) % len(taskorder)]
+#    if taskFlair == "suc":
+#        taskFlair = "err"
+#    elif taskFlair == "err":
+#        taskFlair = "gen"
+#    elif taskFlair == "gen":
+#        taskFlair = "tsk"
+#    elif taskFlair == "tsk":
+#        taskFlair = "suc"
+#    else:
+#        taskFlair = "tsk"
     # wr(stdscr, str(type(taskFlair)) + ": " + taskFlair, stdscr.getmaxyx()[0]-1, "force")
     # stdscr.refresh()
     # stdscr.getch()
-    data[pos]["flair"] = taskFlair
+    data[pos]["flair"] = newTaskFlair
     return data
 
 
@@ -632,10 +641,11 @@ def editMode(stdscr, data, pos):
             data[pos]["text"] = text
             cont = False
             break
-        elif inp in [27]: #escape
+        elif inp in escape: #escape
             cont = False
             break
         elif inp in [22]: #ctrl + v
+            # ingen enkel måte å grabbe fra clipboard på
             pass
         elif inp in [410]: #win+f
             pass
@@ -658,16 +668,68 @@ def editMode(stdscr, data, pos):
             cursorx -= 1
         elif inp == c.KEY_RIGHT:
             cursorx += 1
-        elif inp in shiftleft:
-            if cursorx <= 0 + 5:
+        elif inp in shiftleft or inp in ctrlleft:
+            if not " " in text[::-1][len(text)-cursorx:]:
                 cursorx = 0
             else:
-                cursorx -= 5
-        elif inp in shiftright:
-            if cursorx >= len(text) - 5:
-                cursorx = len(text)
+                if not cursorx == 0:
+                    distance = text[::-1][len(text)-cursorx:].index(" ") + 1
+                    if cursorx <= 0 + distance:
+                        cursorx = 0
+                    else:
+                        cursorx -= distance
+ #           alert(stdscr, "c: " + str(cursorx))
+        elif inp in shiftright or inp in ctrlright:
+            if not cursorx >= len(text) and text[cursorx] == " ":
+                isOnSpace = 1
             else:
-                cursorx += 5
+                isOnSpace = 0
+            if not cursorx == len(text):
+                if not " " in text[cursorx + isOnSpace:]:
+                    cursorx = len(text)
+                else:
+                    distance = text[cursorx + isOnSpace:].index(" ") + isOnSpace
+                    if cursorx >= len(text) - distance:
+                        cursorx = len(text)
+                    else:
+                        cursorx += distance
+            # alert(stdscr, "c: " + str(cursorx) + "  d:" + str(distance))
+            # stdscr.refresh()
+            # stdscr.getch()
+        elif inp in [263]: # ctrl+backspace
+            if not " " in text[::-1][len(text)-cursorx:]:
+                text = text[cursorx:]
+                cursorx = 0
+            else:
+                if not cursorx == 0:
+                    distance = text[::-1][len(text)-cursorx:].index(" ") + 1
+                    if cursorx <= 0 + distance:
+                        text = text[cursorx:]
+                        cursorx = 0
+                    else:
+                        text = text[:cursorx - distance] + text[cursorx:]
+                        cursorx -= distance
+ #           alert(stdscr, "c: " + str(cursorx))
+        elif inp in [520]: # ctrl+delete
+            if not cursorx >= len(text) and text[cursorx] == " ":
+                isOnSpace = 1
+            else:
+                isOnSpace = 0
+            if not cursorx == len(text):
+                if not " " in text[cursorx + isOnSpace:]:
+                    text = text[:cursorx]
+                    cursorx = len(text)
+                else:
+                    distance = text[cursorx + isOnSpace:].index(" ") + isOnSpace
+                    if cursorx >= len(text) - distance:
+                        text = text[:cursorx]
+                        cursorx = len(text)
+                    else:
+                        text = text[:cursorx] + text[cursorx + distance:]
+                        # cursorx += distance
+            # alert(stdscr, "c: " + str(cursorx) + "  d:" + str(distance))
+            # stdscr.refresh()
+            # stdscr.getch()
         elif not len(text) >= 255:
             if not inp == False:
                 letter = chr(inp)
@@ -798,7 +860,7 @@ def getname(stdscr, storage, fulldata):
                 rePrintListNames(stdscr, listnames)
             else:
                 alert(stdscr, "Reached maximum number of lists" + (255 * " "))
-        elif key in [113, 81, 120, 88, 27]: #q, x og Esc
+        elif key in [113, 81, 120, 88, 27, 24]: #q, x og Esc, ctrl+x
             # Quits without saving
             cont = False
             exit()
@@ -864,23 +926,11 @@ def updateFulldata(stdscr, fulldata, currentList, listnames=False):
     return fulldata
 
 
-def main(stdscr):
-    global ywinscroll
+def run(stdscr, storage):
     global xwinscroll
-    c.init_pair(1, c.COLOR_YELLOW, c.COLOR_BLACK)
-    c.init_pair(2, c.COLOR_BLUE, c.COLOR_BLACK)
-    c.init_pair(3, c.COLOR_GREEN, c.COLOR_BLACK)
-    c.init_pair(4, c.COLOR_RED, c.COLOR_BLACK)
-    c.init_pair(5, c.COLOR_BLACK, c.COLOR_WHITE)
-
-    storage, confFolder = defineStorage()
-
-    stdscr.clear()
-    c.curs_set(2)
-    c.noecho()
-    initCheck(stdscr, storage, confFolder)
-
+    global ywinscroll
     fulldata = readData(stdscr, storage)
+
     currentList, listnames = getname(stdscr, storage, fulldata)
     fulldata = updateFulldata(stdscr, fulldata, currentList, listnames)
     writeData(stdscr, storage, fulldata, currentList)
@@ -1006,7 +1056,7 @@ def main(stdscr):
             data = editMode(stdscr, data, y+ywinscroll)
             #stdscr.move(y, scrollx)
             resetView(stdscr, storage, data, y)
-        elif key in [113, 81, 120, 88, 27]: #q, x og Esc
+        elif key in [113, 81, 120, 88, 27, 24]: #q, x og Esc, ctrl+x
             resetView(stdscr, storage, data)
             data = sortData(stdscr, data)
             writeData(stdscr, storage, fulldata, currentList, data)
@@ -1019,6 +1069,28 @@ def main(stdscr):
         #alert(stdscr, "Scroll:                      " + str(xwinscroll))
 
         stdscr.refresh()
+
+
+def main(stdscr):
+    global ywinscroll
+    global xwinscroll
+    c.init_pair(1, c.COLOR_YELLOW, c.COLOR_BLACK)
+    c.init_pair(2, c.COLOR_BLUE, c.COLOR_BLACK)
+    c.init_pair(3, c.COLOR_GREEN, c.COLOR_BLACK)
+    c.init_pair(4, c.COLOR_RED, c.COLOR_BLACK)
+    c.init_pair(5, c.COLOR_BLACK, c.COLOR_WHITE)
+
+    storage, confFolder = defineStorage()
+
+    stdscr.clear()
+    c.curs_set(2)
+    c.noecho()
+    initCheck(stdscr, storage, confFolder)
+
+    while True:
+        run(stdscr, storage)
+
+
 
 set_shorter_esc_delay_in_os()
 c.wrapper(main)
