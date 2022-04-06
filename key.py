@@ -10,7 +10,7 @@ def resetView(stdscr):
 
 def main(stdscr):
     stdscr.clear()
-    c.curs_set(2)
+    c.curs_set(0) # invisible cursor
     c.echo()
     c.init_pair(1, c.COLOR_GREEN, c.COLOR_BLACK)
     c.init_pair(2, c.COLOR_BLACK, c.COLOR_WHITE)
