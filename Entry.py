@@ -1,14 +1,19 @@
 #!/bin/python3
 from time import time
 
+from Extras import *
+
 class Entry:
-    def __init__(self, text="New entry :)", flair=Flairs.tsk, time=int(time())):
+    def __init__(self, parent, text="New entry :)", flair=Flairs.tsk, time=int(time())):
         self.text = text
         self.flair = flair
         self.time = time
+        self.parent = parent
 
 
-    def edit(newText=self.text):
+    def edit(newText=None):
+        if newText == None:
+            newText = self.text
         self.text = newText
         return
 
@@ -25,6 +30,11 @@ class Entry:
         return dic
 
 
+    def delete(self):
+        parent.entries.remove(parent.entries.index(self))
+        return
+
+
     def getFlair(self):
         return self.flair
 
@@ -35,5 +45,5 @@ class Entry:
         return self.time
 
 
-    def __repr__():
-        return f"Entry({text=}, {flair=}, {time=})"
+    def __repr__(self):
+        return f"Entry({self.text=}, {self.flair=}, {self.time=})"

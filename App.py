@@ -5,499 +5,313 @@ from platform import system
 from time import sleep, time
 import json
 
-scrollx = 1
-editx = 4
-ywinscroll = 0
-xwinscroll = 0
-
-# Keybinds
-backspace = [263, 127] # utenom ctrl+backspace (263) og c.KEY_BACKSPACE
-delete = [330, 383]
-ctrlbackspace = [8]
-enter = [c.KEY_ENTER, 10, 13, 15] # ctrl+o (15)
-escape = [27, 24] # ctrl+x (24)
-shiftup = [337, 547]
-shiftdown = [336, 548]
-shiftleft = [393, 391]
-shiftright = [402, 400]
-ctrlleft = [546, 544]
-ctrlright = [561, 559]
-
-def defineStorage():
-    if system() == "Windows":
-        import getpass
-        confFolder = 'C:\\Users\\' + getpass.getuser() + '\\todo\\'
-        storage = confFolder + "storage.json"
-    elif system() == "Linux" or system() == "Darwin":
-        try:
-            home = path.expanduser("~") + "/"
-        except:
-            print(err + "Could not find home folder")
-            exit()
-        confFolder = home + ".todo/"
-        storage = confFolder + "storage.json"
-    else:
-        print("can't recognize OS, edit script to fit")
-        exit()
-    return storage, confFolder
+from Todo import *
+from Extras import *
+from Entry import *
+from EntryList import *
 
 
-def newfilecontent(asjson=False):
-    newcontent = {
-    	"general" : [
-    		{
-    			"flair" : "gen",
-    			"text" : "New list...",
-    			"time" : int(time())
-    		}
-        ]
-    }
-    # newcontent = json.loads({
-    # 	'general' : [
-    # 		{
-    # 			'flair' : 'gen',
-    # 			'text' : 'Be productive',
-    # 			'time' : int(time())
-    # 		},
-    # 		{
-    # 			'flair' : 'gen',
-    # 			'text' : '(maybe)',
-    # 			'time' : int(time())
-    # 		},
-    # 		{
-    # 			'flair' : 'tsk',
-    # 			'text' : 'Make a new list',
-    # 			'time' : int(time())
-    # 		}
-    #     ]
-    # })
-    if not asjson:
-        newcontent = str(newcontent)
-    return newcontent
+class App:
+    def __init__(self, stdscr, todo):
+        self.stdscr = stdscr
+        self.todo = todo
+
+        self.chosenEntryList = False
+        # default settings
+        self.scrollx = 1
+        self.scrolly = 0
+        self.editx = 4
+        self.xwinscroll = 0
+        self.ywinscroll = 0
 
 
-def set_shorter_esc_delay_in_os():
-    environ.setdefault('ESCDELAY', '25')
+    def set_shorter_esc_delay_in_os():
+        environ.setdefault('ESCDELAY', '25')
 
 
-def helpfunc(stdscr, storage, data):
-    helpstr = """Keys             :   Actions
-
-    h                :   Display this help screen
-    r                :   Refresh terminal window
-
-    up, down         :   Scroll vertically in the list
-    left, right      :   Scroll horizontally in the list
-
-    shift + up|down  :   Move task in list
-
-    +, a             :   Add task to list on cursor
-    backspace, d     :   Delete task from list on cursor
-        This will ask for confirmation.
-          enter, y, backspace   : Yes
-          escape, n, c, q       : No
-
-    enter, e         :   Edit task text
-        This will allow you to edit selected task
-          enter                 : Save
-          escape                : Cancel
-    space            :   Switch task 'state' on cursor
-
-    esc, q, x        :   Exit program
+    def cleanInp(inp):
+        dict = {165:229, 133:197, 184:248, 152:216, 166:230, 134:198}
+        if inp in dict:
+            inp = dict[inp]
+        elif inp == 195: #Ã
+            inp = False
+        return inp
 
 
-
-    Hotkeys for the list menu:
-    +, a             :   Add list
-    r                :   Rename list
-    backspace, delete:   Delete list"""
-
-    if stdscr.getmaxyx()[1] <= 56:
-        helpstr = helpstr.replace("  ", " ")
-    if stdscr.getmaxyx()[0] <= 4:
-        helpstr = """Make your terminal
-        size larget to read
-        all the instructions"""
-    stdscr.clear()
-    for i, line in enumerate(helpstr.splitlines()):
-        if i == 0:
-            wr(stdscr, line, i, "inf")
-        else:
-            wr(stdscr, line, i)
-
-    alert(stdscr, "Press any key to exit this menu")
-
-    stdscr.move(0, 1)
-    stdscr.refresh()
-    wait = stdscr.getch()
-    resetView(stdscr, storage, data)
+    def chooseEntryList(self, eL=False):
+        self.chosenEntryList = eL
 
 
-def alert(stdscr, text):
-    stdscr.attron(c.color_pair(5))
-
-    #text = "Escape: cancel      Enter: save changes"
-    text = text[xwinscroll:stdscr.getmaxyx()[1]+xwinscroll-1]
-    text = text + " "*int(stdscr.getmaxyx()[1] - len(text))
-    if len(text) < 1:
-        text = " "
-    wr(stdscr, text, stdscr.getmaxyx()[0]-1, "force")
-
-    stdscr.attroff(c.color_pair(5))
-
-    stdscr.refresh()
-
-
-def cleanInp(inp):
-    dict = {165:229, 133:197, 184:248, 152:216, 166:230, 134:198}
-    if inp in dict:
-        inp = dict[inp]
-    elif inp == 195: #Ã
-        inp = False
-    return inp
-
-
-def scrollup(stdscr, data, y):
-    global ywinscroll
-    global xwinscroll
-    if stdscr.getyx()[0] <= 0:
-        winrefresh(stdscr, data, "up", y)
-        shifted = True
-    else:
-        shifted = False
-
-    if not shifted:
-        if stdscr.getyx()[0] > 0:
-            stdscr.move(y-1, scrollx)
-        else:
-            stdscr.move(0, scrollx)
-    elif shifted:
-        if ywinscroll >= len(data)-1-(stdscr.getmaxyx()[0]-2):
-            if len(data) == 0:
-                # Put stdscr.move(stdscr.getmaxyx()[0], scrollx) here to remove indent effect on scrollup with empty list
-                pass
-            elif len(data)-1 <= (stdscr.getmaxyx()[0]-2):
-                stdscr.move(len(data)-1, scrollx)
-            else:
-                stdscr.move(stdscr.getmaxyx()[0]-2, scrollx)
-        else:
-            stdscr.move(0, scrollx)
-    else:
-        stdscr.move(0, scrollx)
-    stdscr.refresh()
-
-
-def scrolldown(stdscr, data, y):
-    global ywinscroll
-    global xwinscroll
-    if stdscr.getyx()[0] >= stdscr.getmaxyx()[0]-2 or ywinscroll+stdscr.getyx()[0] >= len(data)-1:
-        winrefresh(stdscr, data, "down", y)
-        shifted = True
-    else:
-        shifted = False
-
-    if not shifted:
-        if stdscr.getyx()[0] < (stdscr.getmaxyx()[0]-2) or ywinscroll+stdscr.getyx()[0] <= len(data)-1:
-            stdscr.move(y+1, scrollx)
-        else:
-            stdscr.move(0, scrollx)
-    elif shifted:
-        if ywinscroll <= 0:
-            stdscr.move(0, scrollx)
-        else:
-            stdscr.move(y, scrollx)
-    else:
-        stdscr.move(0, scrollx)
-    stdscr.refresh()
-
-
-def winrefresh(stdscr, data, direction="none", y=0):
-    global ywinscroll
-    global xwinscroll
-    if direction == "up":
-        if ywinscroll <= 0:
-            if len(data)-1 <= (stdscr.getmaxyx()[0]-2):
-                ywinscroll = 0
-            else:
-                ywinscroll = len(data)-1-(stdscr.getmaxyx()[0]-2)
-        else:
-            ywinscroll -= 1
-
-    if direction == "down":
-        if ywinscroll >= len(data)-(stdscr.getmaxyx()[0]-2) or ywinscroll+stdscr.getyx()[0] >= len(data)-1:
-            ywinscroll = 0
-        else:
-            ywinscroll += 1
-
-    elif direction == "right" and xwinscroll <= 247:
-        xwinscroll += 8
-    elif direction == "left" and xwinscroll >= 8:
-        xwinscroll -= 8
-
-    stdscr.clear()
-    # printData(stdscr, data, False, ywinscroll, xwinscroll)
-    printData(stdscr, data, False)
-    # alert(stdscr, str(xwinscroll))
-    # stdscr.getch()
-    #printData(stdscr)
-    #stdscr.move(stdscr.getyx()[0], scrollx)
-    stdscr.refresh()
-
-
-def wr(stdscr, text, row, flair="", focus=False):
-    h, w = stdscr.getmaxyx()
-    if not row >= h-1 or flair == "force":
-        if not flair in ["", "force"]:
-            text = text[:w-5]
-        else:
-            text = text[:w-1]
-
-        if flair == "prompt":
-            prompt = "[_] "
-            stdscr.attron(c.color_pair(1))
-            stdscr.addstr(row, 0, prompt)
-            stdscr.attroff(c.color_pair(1))
-            if focus:
-                stdscr.attron(c.color_pair(5))
-                stdscr.addstr(row, len(prompt), text)
-                stdscr.attroff(c.color_pair(5))
-            else:
-                stdscr.addstr(row, len(prompt), text)
-        elif flair == "inf":
-            inf = "[i] "
-            stdscr.attron(c.color_pair(2))
-            stdscr.addstr(row, 0, inf)
-            stdscr.attroff(c.color_pair(2))
-            if focus:
-                stdscr.attron(c.color_pair(5))
-                stdscr.addstr(row, len(inf), text)
-                stdscr.attroff(c.color_pair(5))
-            else:
-                stdscr.addstr(row, len(inf), text)
-        elif flair == "tsk":
-            tsk = "[ ] "
-            stdscr.attron(c.color_pair(2))
-            stdscr.addstr(row, 0, tsk)
-            stdscr.attroff(c.color_pair(2))
-            if focus:
-                stdscr.attron(c.color_pair(5))
-                stdscr.addstr(row, len(tsk), text)
-                stdscr.attroff(c.color_pair(5))
-            else:
-                stdscr.addstr(row, len(tsk), text)
-        elif flair == "suc":
-            suc = "[+] "
-            stdscr.attron(c.color_pair(3))
-            stdscr.addstr(row, 0, suc)
-            stdscr.attroff(c.color_pair(3))
-            if focus:
-                stdscr.attron(c.color_pair(5))
-                stdscr.addstr(row, len(suc), text)
-                stdscr.attroff(c.color_pair(5))
-            else:
-                stdscr.addstr(row, len(suc), text)
-        elif flair == "err":
-            err = "[x] "
-            stdscr.attron(c.color_pair(4))
-            stdscr.addstr(row, 0, err)
-            stdscr.attroff(c.color_pair(4))
-            if focus:
-                stdscr.attron(c.color_pair(5))
-                stdscr.addstr(row, len(err), text)
-                stdscr.attroff(c.color_pair(5))
-            else:
-                stdscr.addstr(row, len(err), text)
-        elif flair == "gen":
-            err = "[-] "
-            stdscr.addstr(row, 0, err)
-            if focus:
-                stdscr.attron(c.color_pair(5))
-                stdscr.addstr(row, len(err), text)
-                stdscr.attroff(c.color_pair(5))
-            else:
-                stdscr.addstr(row, len(err), text)
-        else:
-            if focus:
-                stdscr.attron(c.color_pair(5))
-                stdscr.addstr(row, 0, text)
-                stdscr.attroff(c.color_pair(5))
-            else:
-                stdscr.addstr(row, 0, text)
-
-
-def initCheck(stdscr, storage, confFolder):
-    if not path.exists(storage):
-        if not path.exists(confFolder):
-            try:
-                mkdir(confFolder)
-                print("Made directory: " + confFolder)
-            except:
-                print("Could not create directory: " + confFolder)
-                exit()
-        try:
-            # debu(stdscr, str(json.dumps(newfilecontent())))
-            with open(storage, "w") as file:
-                file.write(str(json.dumps(newfilecontent())))
-            print("Made file: " + storage)
-        except:
-            print("Could not create file: " + storage)
-            exit()
-
-
-def readData(stdscr, storage):
-    with open(storage, "r") as file:
-        try:
-            fulldata = json.load(file)
-            # debu(stdscr, str(fulldata))
-        except:
-            debu(stdscr, "Try deleting ~/.todo/storage.json, it may be corrupt")
-            exit()
-
-    if len(str(fulldata)) == 0:
-        fulldata = {"general":[{"flair":"tsk","text":"List cannot be empty :)","time":int(time())}]}
-        # data = {"general":[{"flair":"tsk","text":"List cannot be empty :)","time":int(time())}]}
-    return fulldata
-
-
-
-def printData(stdscr, data, focus=False):
-    global ywinscroll
-    global xwinscroll
-    h, w = stdscr.getmaxyx()
-    # if len(name) < 0:
-    #     name = False
-    data = data[ywinscroll:ywinscroll+stdscr.getmaxyx()[0]-1]
-    for i, text in enumerate(data):
-        #alert(stdscr, data)
-        #stdscr.getch()
-        # alert(stdscr, text)
-        # stdscr.getch()
-        #text = text["text"]
-        if xwinscroll <= 0:
-            plus = 4
-            scrolled = False
-        else:
-            plus = 0
-            scrolled = True
-        # debu(stdscr, str(text))
-        # debu(stdscr, str(data))
-        text = text["text"][xwinscroll:stdscr.getmaxyx()[1]+xwinscroll-1]
+    def alert(self, text):
+        self.stdscr.attron(c.color_pair(5))
+        text = text[self.xwinscroll:self.stdscr.getmaxyx()[1]+self.xwinscroll-1]
+        text = text + " "*int(self.stdscr.getmaxyx()[1] - len(text))
         if len(text) < 1:
-            text = text + " "
+            text = " "
+        self.wr(text, self.stdscr.getmaxyx()[0]-1, "force")
 
-        #alert(stdscr, str(data[i]))
-        #stdscr.getch()
-        if scrolled or data[i]["flair"] == "pil":
-            if not focus == False and focus == i:
-                wr(stdscr, text, i, True)
+        self.stdscr.attroff(c.color_pair(5))
+
+        self.stdscr.refresh()
+        return
+
+
+    def resetView(self, todo):
+        return
+
+
+    def prompt(self):
+        return
+
+
+    def helpFunc(self):
+        helpstr = """Keys             :   Actions
+
+        h                :   Display this help screen
+        r                :   Refresh terminal window
+
+        up, down         :   Scroll vertically in the list
+        left, right      :   Scroll horizontally in the list
+
+        shift + up|down  :   Move task in list
+
+        +, a             :   Add task to list on cursor
+        backspace, d     :   Delete task from list on cursor
+            This will ask for confirmation.
+              enter, y, backspace   : Yes
+              escape, n, c, q       : No
+
+        enter, e         :   Edit task text
+            This will allow you to edit selected task
+              enter                 : Save
+              escape                : Cancel
+        space            :   Switch task 'state' on cursor
+
+        esc, q, x        :   Exit program
+
+
+        Hotkeys for the list menu:
+        +, a             :   Add list
+        r                :   Rename list
+        backspace, delete:   Delete list"""
+        if self.stdscr.getmaxyx()[1] <= 56:
+            helpstr = helpstr.replace("    ", " ")
+        if self.stdscr.getmaxyx()[0] <= 4:
+            helpstr = """Make your terminal
+            size larget to read
+            all the instructions"""
+        self.stdscr.clear()
+        for i, line in enumerate(helpstr.splitlines()):
+            if i == 0:
+                self.wr(line, i, Flairs.inf)
             else:
-                wr(stdscr, text, i)
-        elif data[i]["flair"] in ["suc", "err", "tsk", "gen"]:
-            if not focus == False and focus == i:
-                wr(stdscr, text, i, data[i]["flair"], True)
-            else:
-                wr(stdscr, text, i, data[i]["flair"])
+                self.wr(line, i)
+
+        self.alert("Press any key to exit this menu")
+
+        self.stdscr.move(0, 1)
+        self.stdscr.refresh()
+        wait = self.stdscr.getch()
+        self.resetView()
+        return
+
+
+    def getData(self):
+        results = []
+        if not self.chosenEntryList is False:
+            for e in self.chosenEntryList:
+                results.append(e)
         else:
-            if not focus == False and focus == i:
-                wr(stdscr, text, i, "tsk", True)
+            for l in self.todo.getEntryLists():
+                results.append(l)
+        return results
+
+
+    def winrefresh(self, direction=False):
+        # self.scrolly
+        # self.stdscr
+        return
+
+
+    def scrollup(self):
+        if self.stdscr.getyx()[0] <= 0:
+            self.winrefresh(self.getData(), "up")
+            shifted = True
+        else:
+            shifted = False
+
+        if not shifted:
+            if self.stdscr.getyx()[0] > 0:
+                self.stdscr.move(scrolly-1, self.scrollx)
             else:
-                wr(stdscr, text, i, "tsk")
+                self.stdscr.move(0, self.scrollx)
+        elif shifted:
+            if self.ywinscroll >= len(self.getData())-1-(self.stdscr.getmaxyx()[0]-2):
+                if len(self.getData()) == 0:
+                    # Put self.stdscr.move(self.stdscr.getmaxyx()[0], self.scrollx) here to remove indent effect on scrollup with empty list
+                    pass
+                elif len(self.getData())-1 <= (self.stdscr.getmaxyx()[0]-2):
+                    self.stdscr.move(len(self.getData())-1, self.scrollx)
+                else:
+                    self.stdscr.move(self.stdscr.getmaxyx()[0]-2, self.scrollx)
+            else:
+                self.stdscr.move(0, self.scrollx)
+        else:
+            self.stdscr.move(0, self.scrollx)
+        self.stdscr.refresh()
+        return
 
 
-def writeData(stdscr, storage, fulldata, currentList=False, data=False):
-    if not data or currentList:
-        pass
-    else:
-        #return True
-        newdata = {}
-        #try:
-        # TODO: Sørg for at linjen under har tilgjengelig informasjon
-        names = getAllNames(fulldata)
-        for i in names:
-            #alert(stdscr, str(i))
-            #stdscr.getch()
-            if i == currentList:
-                fulldata[currentList] = data
-            # else:
-            #     newdata[i] = readData(stdscr, i)
+    def scrolldown(self):
+        if self.stdscr.getyx()[0] >= self.stdscr.getmaxyx()[0]-2 or self.ywinscroll+self.stdscr.getyx()[0] >= len(self.getData())-1:
+            self.winrefresh(self.getData(), "down")
+            shifted = True
+        else:
+            shifted = False
 
-        #dat = {}
-        #dat[0] = data
-
-    #Her må noe fikses...
-    # debu(stdscr, str(fulldata))
-    with open(storage, "w") as file:
-        #data = json.dumps(data, indent=4)
-        json.dump(fulldata, file, ensure_ascii=False, indent=4)
-        # file.write(json.dumps(fulldata, ensure_ascii=False, indent=4))
-        # Start med denne linja
-    return True
-    # except:
-    #     #return False
-    #     print("Something got fucked while trying to write to storage")
-    #     exit()
+        if not shifted:
+            if self.stdscr.getyx()[0] < (self.stdscr.getmaxyx()[0]-2) or self.ywinscroll+self.stdscr.getyx()[0] <= len(self.getData())-1:
+                self.stdscr.move(y+1, self.scrollx)
+            else:
+                self.stdscr.move(0, self.scrollx)
+        elif shifted:
+            if ywinscroll <= 0:
+                self.stdscr.move(0, self.scrollx)
+            else:
+                self.stdscr.move(y, self.scrollx)
+        else:
+            self.stdscr.move(0, self.scrollx)
+        self.stdscr.refresh()
+        return
 
 
-def sortData(stdscr, data):
-    return data
+    def winrefresh(self, direction="none", y=0):
+        if direction == "up":
+            if self.ywinscroll <= 0:
+                if len(self.getData())-1 <= (self.stdscr.getmaxyx()[0]-2):
+                    self.ywinscroll = 0
+                else:
+                    self.ywinscroll = len(self.getData())-1-(self.stdscr.getmaxyx()[0]-2)
+            else:
+                self.ywinscroll -= 1
+
+        if direction == "down":
+            if self.ywinscroll >= len(self.getData())-(self.stdscr.getmaxyx()[0]-2) or self.ywinscroll+self.stdscr.getyx()[0] >= len(self.getData())-1:
+                self.ywinscroll = 0
+            else:
+                self.ywinscroll += 1
+
+        elif direction == "right" and self.xwinscroll <= 247:
+            self.xwinscroll += 8
+        elif direction == "left" and self.xwinscroll >= 8:
+            self.xwinscroll -= 8
+
+        self.stdscr.clear()
+        printData(self.getData(), False)
+        self.stdscr.refresh()
+        return
 
 
-def resetView(stdscr, storage, data, y=0):
-    #global ywinscroll
+    def wr(self, text, row, flair=Flairs.gen, focus=False):
+        h, w = self.stdscr.getmaxyx()
+        if row >= h-1 or not flair == "force":
+            if not flair in ["", "force"]:
+                text = text[:w-5]
+            else:
+                text = text[:w-1]
 
-#
-#
-#		Commentet ut linja over her for å se om det fikser noe.
-#
-#
+        try:
+            symbol = FlairSymbols.convert[flair]
+            colorpair = FlairSymbols.color[flair]
+            symbol += " "
+        except:
+            symbol = ""
+            colorpair = FlairSymbols.color[Flairs.gen]
 
-    stdscr.clear()
-    printData(stdscr, data)
-    # stdscr.refresh()
-    # stdscr.getch()
-
-    stdscr.move(y, scrollx)
-    stdscr.refresh()
-
-
-def youSurePrompt(stdscr, storage, data, y):
-    cont = True
-
-    text = data[y-ywinscroll]["text"][xwinscroll:stdscr.getmaxyx()[1]+xwinscroll-1]
-    wr(stdscr, text, y, "prompt")
-
-    alert(stdscr, "Do you want to delete this task? (Y/n) ")
-
-    while cont:
-        accept = stdscr.getch()
-        accept = cleanInp(accept)
-        if accept in enter or accept in [121, 89] or accept in backspace or accept in delete: #enter, y, backspace
-            data.pop(y-ywinscroll)
-            cont = False
-        elif accept in [110, 780, 27, 990, 670, 81, 113]: #n, esc, c, q
-            cont = False
-
-    resetView(stdscr, storage, data, y-ywinscroll)
-    return data
+        self.stdscr.attron(c.color_pair(colorpair))
+        self.stdscr.addstr(row, 0, symbol)
+        self.stdscr.attroff(c.color_pair(colorpair))
+        if focus:
+            self.stdscr.attron(c.color_pair(FlairSymbols.color[Flairs.gen]))
+            self.stdscr.addstr(row, len(symbol), text)
+            self.stdscr.attroff(c.color_pair(FlairSymbols.color[Flairs.gen]))
+        else:
+            self.stdscr.addstr(row, len(symbol), text)
+        return
 
 
-def deleteListName(stdscr, listofnames, y):
-    text = listofnames[y]
-    wr(stdscr, text, y, "prompt")
-    alert(stdscr, "Do you want to delete this list? (Y/n) ")
+    def printData(self):
+        h, w = self.stdscr.getmaxyx()
+        entries = self.getData()[self.ywinscroll:self.ywinscroll+self.stdscr.getmaxyx()[0]-1]
+        for i, entry in enumerate(entries):
+            if self.xwinscroll <= 0: # Account for flairs aka symbols
+                plus = 4
+                scrolled = False
+            else:
+                plus = 0
+                scrolled = True
+                # self.debu(str(entry))
+                # self.debu(str(data))
+                entryText = entryText.getText()[self.xwinscroll:self.stdscr.getmaxyx()[1]+self.xwinscroll-1]
+                if len(entryText) < 1:
+                    entryText = entryText + " "
+            self.wr(entryText, i, entry.getFlair())
+        return
 
-    cont = True
-    while cont:
-        accept = stdscr.getch()
-        accept = cleanInp(accept)
-        if accept in enter or accept in [121, 89] or accept in backspace or accept in delete: #enter, y, backspace
-            delname = listofnames.pop(y)
-            cont = False
-        elif accept in [110, 780, 27, 990, 670, 81, 113]: #n, esc, c, q
-            cont = False
 
-    #TODO gjøre så faktisk fjerner
-    return listofnames, delname
+    def resetView(self, y=0):
+        self.stdscr.clear()
+        self.printData()
+        self.stdscr.move(y, self.scrollx)
+        self.stdscr.refresh()
+        return
+
+
+    def youSurePrompt(self, y):
+        entry = self.getData()[y-self.ywinscroll]
+        text = entry.getText()[self.xwinscroll:self.stdscr.getmaxyx()[1]+self.xwinscroll-1]
+        self.wr(text, y, Flairs.prt)
+
+        self.alert("Do you want to delete this entry? (Y/n) ")
+
+        cont = True
+        while cont:
+            accept = self.stdscr.getch()
+            accept = self.cleanInp(accept)
+            if accept in Keybinds.enter or accept in [121, 89] or accept in Keybinds.backspace or accept in Keybinds.delete: #enter, y, backspace
+                entry.delete()
+                cont = False
+            elif accept in [110, 780, 27, 990, 670, 81, 113]: #n, esc, c, q
+                cont = False
+
+        self.resetView(y-self.ywinscroll)
+        return
+
+
+    def deleteListName(self, y): # Accesser før man velger liste
+        entryList = self.getData()[y]
+        text = entryList.getName()
+        self.wr(text, y, Flairs.prt)
+
+        self.alert("Do you want to delete this list? (Y/n) ")
+
+        cont = True
+        while cont:
+            accept = self.stdscr.getch()
+            accept = self.cleanInp(accept)
+            if accept in Keybinds.enter or accept in [121, 89] or accept in Keybinds.backspace or accept in Keybinds.delete: #enter, y, backspace
+                entryList.delete()
+                cont = False
+            elif accept in [110, 780, 27, 990, 670, 81, 113]: #n, esc, c, q
+                cont = False
+
+        self.resetView(y)
+        return
+
+
+    def __repr__(self):
+        return f"App({stdscr=})"
+
 
 
 def makeNew(stdscr, data, y=0, y2=0):
@@ -637,12 +451,12 @@ def editMode(stdscr, data, pos):
 
         removeLast = False
 
-        if inp in enter:
+        if inp in Keybinds.enter:
             data[pos]["time"] = int(time())
             data[pos]["text"] = text
             cont = False
             break
-        elif inp in escape: #escape
+        elif inp in Keybinds.escape: #escape
             cont = False
             break
         elif inp in [22]: #ctrl + v
@@ -650,13 +464,13 @@ def editMode(stdscr, data, pos):
             pass
         elif inp in [410]: #win+f
             pass
-        elif inp in backspace:
+        elif inp in Keybinds.backspace:
             if cursorx > 0:
                 text = text[:cursorx-1] + text[cursorx:]
                 cursorx -= 1
                 text = text + " "
                 removeLast = True
-        elif inp in delete: #delete
+        elif inp in Keybinds.delete: #delete
             if cursorx < len(text):
                 text = text[:cursorx] + text[cursorx+1:]
                 text = text + " "
@@ -669,7 +483,7 @@ def editMode(stdscr, data, pos):
             cursorx -= 1
         elif inp == c.KEY_RIGHT:
             cursorx += 1
-        elif inp in shiftleft or inp in ctrlleft:
+        elif inp in shiftleft or inp in Keybinds.ctrlleft:
             if not " " in text[::-1][len(text)-cursorx:]:
                 cursorx = 0
             else:
@@ -680,7 +494,7 @@ def editMode(stdscr, data, pos):
                     else:
                         cursorx -= distance
  #           alert(stdscr, "c: " + str(cursorx))
-        elif inp in shiftright or inp in ctrlright:
+        elif inp in shiftright or inp in Keybinds.ctrlright:
             if not cursorx >= len(text) and text[cursorx] == " ":
                 isOnSpace = 1
             else:
@@ -697,7 +511,7 @@ def editMode(stdscr, data, pos):
             # alert(stdscr, "c: " + str(cursorx) + "  d:" + str(distance))
             # stdscr.refresh()
             # stdscr.getch()
-        elif inp in ctrlbackspace: # ctrl+backspace
+        elif inp in [263]: # ctrl+backspace
             if not " " in text[::-1][len(text)-cursorx:]:
                 text = text[cursorx:]
                 cursorx = 0
@@ -829,7 +643,7 @@ def getname(stdscr, storage, fulldata):
         stdscr.move(cursor, x)
 
         key = stdscr.getch()
-        if key in enter or key == 32:
+        if key in Keybinds.enter or key == 32:
             try:
                 name = listnames[cursor]
                 # debu(stdscr, str(listnames[0]))
@@ -887,7 +701,7 @@ def getname(stdscr, storage, fulldata):
             stdscr.move(cursor, x)
             stdscr.refresh()
 
-        elif len(listnames) > 0 and (key in backspace or key in delete): #backspace, delete
+        elif len(listnames) > 0 and (key in Keybinds.backspace or key in Keybinds.delete): #backspace, delete
             listnames, delname = deleteListName(stdscr, listnames, cursor)
             fulldata.pop(delname)
             writeData(stdscr, storage, fulldata)
@@ -984,7 +798,7 @@ def run(stdscr, storage):
                     forts = False
                     key = k
             data = sortData(stdscr, data)
-            resetView(stdscr, storage, data, y)
+            resetView(stdscr, data, y)
         if key == c.KEY_UP:
             scrollup(stdscr, data, y)
         elif key == c.KEY_DOWN:
@@ -1008,57 +822,57 @@ def run(stdscr, storage):
             if stdscr.getyx()[0] > 0:
                 data = sortData(stdscr, moveLine(stdscr, data, y+ywinscroll, True))
                 #stdscr.move(y-1, scrollx)
-                resetView(stdscr, storage, data, y-1)
+                resetView(stdscr, data, y-1)
             else:
                 if ywinscroll < 0:
                     scrollup(stdscr, data, y)
                     data = sortData(stdscr, moveLine(stdscr, data, y+ywinscroll, True))
-                    resetView(stdscr, storage, data, y-1)
+                    resetView(stdscr, data, y-1)
 
         elif key in shiftdown: #shift+down
             if stdscr.getyx()[0] <= stdscr.getmaxyx()[0]-1 and stdscr.getyx()[0] <= len(data)-ywinscroll-2:
                 data = sortData(stdscr, moveLine(stdscr, data, y+ywinscroll))
                 #stdscr.move(y+1, scrollx)
-                resetView(stdscr, storage, data, y+1)
+                resetView(stdscr, data, y+1)
             else:
                 if stdscr.getyx()[0] >= stdscr.getmaxyx()[0]-2 and stdscr.getyx()[0] <= len(data)-ywinscroll-2:
                     scrolldown(stdscr, data, y)
                     data = sortData(stdscr, moveLine(stdscr, data, y+ywinscroll))
-                    resetView(stdscr, storage, data, y)
+                    resetView(stdscr, data, y)
 
         elif key in [43, 97, 65]: #+, a
             #stdscr.move(y, scrollx)
             data = sortData(stdscr, makeNew(stdscr, data, y, ywinscroll))
             data = editMode(stdscr, data, y+ywinscroll)
-            resetView(stdscr, storage, data, y)
+            resetView(stdscr, data, y)
             #wr(stdscr, "Enter", stdscr.getmaxyx()[0]-1)
             #stdscr.move(y, scrollx)
-        elif xwinscroll <= 0 and (key in [100, 68] or key in backspace or key in delete): #backspace, d, delete
+        elif xwinscroll <= 0 and (key in [100, 68] or key in Keybinds.backspace or key in Keybinds.delete): #backspace, d, delete
             data = youSurePrompt(stdscr, storage, data, y+ywinscroll)
         elif key in [114, 82]: #r
             xwinscroll = 0
             ywinscroll = 0
-            resetView(stdscr, storage, data)
+            resetView(stdscr, data)
         elif key in [104, 72]: #h
             helpfunc(stdscr, storage, data)
         # elif key in [115, 83]: #s
-        #     resetView(stdscr, storage, data)
+        #     resetView(stdscr, data)
         #     currentList, listnames = getname(stdscr, fulldata)
         #     data = readData(stdscr, storage)
-        #     resetView(stdscr, storage, data)
+        #     resetView(stdscr, data)
         #     j = 0
 
         elif key in [110, 78]: #n
             #rename(stdscr, data)
             pass
             # Nothing here
-        elif xwinscroll == 0 and (key in enter or key in [101, 69]): #enter, e
+        elif xwinscroll == 0 and (key in Keybinds.enter or key in [101, 69]): #enter, e
             #wr(stdscr, "Space", stdscr.getmaxyx()[0]-1, "force")
             data = editMode(stdscr, data, y+ywinscroll)
             #stdscr.move(y, scrollx)
-            resetView(stdscr, storage, data, y)
+            resetView(stdscr, data, y)
         elif key in [113, 81, 120, 88, 27, 24]: #q, x og Esc, ctrl+x
-            resetView(stdscr, storage, data)
+            resetView(stdscr, data)
             data = sortData(stdscr, data)
             writeData(stdscr, storage, fulldata, currentList, data)
             cont = False
@@ -1073,25 +887,24 @@ def run(stdscr, storage):
 
 
 def main(stdscr):
-    global ywinscroll
-    global xwinscroll
-    c.init_pair(1, c.COLOR_YELLOW, c.COLOR_BLACK)
-    c.init_pair(2, c.COLOR_BLUE, c.COLOR_BLACK)
-    c.init_pair(3, c.COLOR_GREEN, c.COLOR_BLACK)
-    c.init_pair(4, c.COLOR_RED, c.COLOR_BLACK)
-    c.init_pair(5, c.COLOR_BLACK, c.COLOR_WHITE)
+    # c blir automatisk passet til main fra wrapper funksjon.
+    todo = Todo()
+    app = App(stdscr, todo)
+    app.set_shorter_esc_delay_in_os()
 
-    storage, confFolder = defineStorage()
+    c.init_pair(FlairSymbols.color[Flairs.prt], c.COLOR_YELLOW, c.COLOR_BLACK) # Preset farger
+    c.init_pair(FlairSymbols.color[Flairs.tsk], c.COLOR_BLUE, c.COLOR_BLACK)
+    c.init_pair(FlairSymbols.color[Flairs.suc], c.COLOR_GREEN, c.COLOR_BLACK)
+    c.init_pair(FlairSymbols.color[Flairs.err], c.COLOR_RED, c.COLOR_BLACK)
+    c.init_pair(FlairSymbols.color[Flairs.gen], c.COLOR_BLACK, c.COLOR_WHITE)
 
     stdscr.clear()
     c.curs_set(2)
     c.noecho()
-    initCheck(stdscr, storage, confFolder)
 
     while True:
-        run(stdscr, storage)
+        app.run()
 
 
-
-set_shorter_esc_delay_in_os()
-c.wrapper(main)
+if __name__ == "__main__":
+    c.wrapper(main) # Curses wrapper, calls main.
