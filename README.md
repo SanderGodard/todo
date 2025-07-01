@@ -12,4 +12,10 @@ storage in `~/.todo/`
 
 ### Make symlink
 
-`$ sudo ln -s {INSTALL_LOCATION}/todo.py /bin/todo`
+`$ cd todo; sudo ln -s $(pwd)/todo.py /bin/todo`
+
+### Get previous todo list
+
+Found in dotfiles under terminalapps
+
+Use `todo.py` for current working, `Todo.py` is under development.
