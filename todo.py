@@ -1075,10 +1075,15 @@ def run(stdscr, storage):
 def main(stdscr):
     global ywinscroll
     global xwinscroll
-    c.init_pair(1, c.COLOR_YELLOW, c.COLOR_BLACK)
-    c.init_pair(2, c.COLOR_BLUE, c.COLOR_BLACK)
-    c.init_pair(3, c.COLOR_GREEN, c.COLOR_BLACK)
-    c.init_pair(4, c.COLOR_RED, c.COLOR_BLACK)
+    c.use_default_colors()
+    c.start_color()
+
+    BG_COLOR = -1 # Transparent
+
+    c.init_pair(1, c.COLOR_YELLOW, BG_COLOR)
+    c.init_pair(2, c.COLOR_BLUE, BG_COLOR)
+    c.init_pair(3, c.COLOR_GREEN, BG_COLOR)
+    c.init_pair(4, c.COLOR_RED, BG_COLOR)
     c.init_pair(5, c.COLOR_BLACK, c.COLOR_WHITE)
 
     storage, confFolder = defineStorage()

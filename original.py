@@ -9,6 +9,17 @@ from Todo import *
 from Extras import *
 from Entry import *
 from EntryList import *
+from Listview.py import *
+
+# Structure
+## Display with ncurses??
+
+# App
+### Help
+### Listview
+### Points in list
+#### Flair icons
+#### Edit
 
 
 class App:
@@ -741,17 +752,17 @@ def updateFulldata(stdscr, fulldata, currentList, listnames=False):
     return fulldata
 
 
-def run(stdscr, storage):
+def run(self, storage):
     global xwinscroll
     global ywinscroll
-    fulldata = readData(stdscr, storage)
+    fulldata = readData(self.stdscr, storage)
 
-    currentList, listnames = getname(stdscr, storage, fulldata)
-    fulldata = updateFulldata(stdscr, fulldata, currentList, listnames)
-    writeData(stdscr, storage, fulldata, currentList)
+    currentList, listnames = getname(self.stdscr, storage, fulldata)
+    fulldata = updateFulldata(self.stdscr, fulldata, currentList, listnames)
+    writeData(self.stdscr, storage, fulldata, currentList)
     data = fulldata[currentList]
-    # debu(stdscr, str(fulldata))
-    # debu(stdscr, str(currentList))
+    # debu(self.stdscr, str(fulldata))
+    # debu(self.stdscr, str(currentList))
     # fulldata = addNewList(data)
     # Match up data to titles in fulldata, and add standard content
 
@@ -765,125 +776,125 @@ def run(stdscr, storage):
 
     #print(data)
     #while True:
-    stdscr.clear()
+    self.stdscr.clear()
 
-    printData(stdscr, data)
-    stdscr.move(0, scrollx)
-    #stdscr.getch()
-    #stdscr.refresh()
-    #resetView(stdscr, data)
-    stdscr.refresh()
+    printData(self.stdscr, data)
+    self.stdscr.move(0, scrollx)
+    #self.stdscr.getch()
+    #self.stdscr.refresh()
+    #resetView(self.stdscr, data)
+    self.stdscr.refresh()
 
     j = 0
     cont = True
     while cont:
-        key = stdscr.getch()
+        key = self.stdscr.getch()
         key = cleanInp(key)
-        y = stdscr.getyx()[0]
+        y = self.stdscr.getyx()[0]
 
         if key == 32 and xwinscroll <= 0: #space
             forts = True
             while forts:
-                data = flipTask(stdscr, data, y+ywinscroll)
+                data = flipTask(self.stdscr, data, y+ywinscroll)
                 #print(data)
-                #stdscr.getch()
-                #wr(stdscr, data[y+ywinscroll][1:], y, data[y+ywinscroll]["flair"])
-                wr(stdscr, data[y+ywinscroll]["text"], y, data[y+ywinscroll]["flair"])
-                stdscr.move(y, scrollx)
-                stdscr.refresh()
-                k = stdscr.getch()
+                #self.stdscr.getch()
+                #wr(self.stdscr, data[y+ywinscroll][1:], y, data[y+ywinscroll]["flair"])
+                wr(self.stdscr, data[y+ywinscroll]["text"], y, data[y+ywinscroll]["flair"])
+                self.stdscr.move(y, scrollx)
+                self.stdscr.refresh()
+                k = self.stdscr.getch()
                 k = cleanInp(k)
 
                 if not k == 32:
                     forts = False
                     key = k
-            data = sortData(stdscr, data)
-            resetView(stdscr, data, y)
+            data = sortData(self.stdscr, data)
+            resetView(self.stdscr, data, y)
         if key == c.KEY_UP:
-            scrollup(stdscr, data, y)
+            scrollup(self.stdscr, data, y)
         elif key == c.KEY_DOWN:
-            scrolldown(stdscr, data, y)
+            scrolldown(self.stdscr, data, y)
         elif key == c.KEY_RIGHT:
-            winrefresh(stdscr, data, "right")
-            stdscr.move(y, scrollx)
+            winrefresh(self.stdscr, data, "right")
+            self.stdscr.move(y, scrollx)
         elif key == c.KEY_LEFT:
-            winrefresh(stdscr, data, "left")
-            stdscr.move(y, scrollx)
+            winrefresh(self.stdscr, data, "left")
+            self.stdscr.move(y, scrollx)
         elif key in shiftleft:
             while xwinscroll > 0:
-                winrefresh(stdscr, data, "left")
-            stdscr.move(y, scrollx)
+                winrefresh(self.stdscr, data, "left")
+            self.stdscr.move(y, scrollx)
         elif key in shiftright:
             while xwinscroll < 247:
-                winrefresh(stdscr, data, "right")
-            stdscr.move(y, scrollx)
+                winrefresh(self.stdscr, data, "right")
+            self.stdscr.move(y, scrollx)
 
         elif key in shiftup: #shift+up
-            if stdscr.getyx()[0] > 0:
-                data = sortData(stdscr, moveLine(stdscr, data, y+ywinscroll, True))
-                #stdscr.move(y-1, scrollx)
-                resetView(stdscr, data, y-1)
+            if self.stdscr.getyx()[0] > 0:
+                data = sortData(self.stdscr, moveLine(self.stdscr, data, y+ywinscroll, True))
+                #self.stdscr.move(y-1, scrollx)
+                resetView(self.stdscr, data, y-1)
             else:
                 if ywinscroll < 0:
-                    scrollup(stdscr, data, y)
-                    data = sortData(stdscr, moveLine(stdscr, data, y+ywinscroll, True))
-                    resetView(stdscr, data, y-1)
+                    scrollup(self.stdscr, data, y)
+                    data = sortData(self.stdscr, moveLine(self.stdscr, data, y+ywinscroll, True))
+                    resetView(self.stdscr, data, y-1)
 
         elif key in shiftdown: #shift+down
-            if stdscr.getyx()[0] <= stdscr.getmaxyx()[0]-1 and stdscr.getyx()[0] <= len(data)-ywinscroll-2:
-                data = sortData(stdscr, moveLine(stdscr, data, y+ywinscroll))
-                #stdscr.move(y+1, scrollx)
-                resetView(stdscr, data, y+1)
+            if self.stdscr.getyx()[0] <= self.stdscr.getmaxyx()[0]-1 and self.stdscr.getyx()[0] <= len(data)-ywinscroll-2:
+                data = sortData(self.stdscr, moveLine(self.stdscr, data, y+ywinscroll))
+                #self.stdscr.move(y+1, scrollx)
+                resetView(self.stdscr, data, y+1)
             else:
-                if stdscr.getyx()[0] >= stdscr.getmaxyx()[0]-2 and stdscr.getyx()[0] <= len(data)-ywinscroll-2:
-                    scrolldown(stdscr, data, y)
-                    data = sortData(stdscr, moveLine(stdscr, data, y+ywinscroll))
-                    resetView(stdscr, data, y)
+                if self.stdscr.getyx()[0] >= self.stdscr.getmaxyx()[0]-2 and self.stdscr.getyx()[0] <= len(data)-ywinscroll-2:
+                    scrolldown(self.stdscr, data, y)
+                    data = sortData(self.stdscr, moveLine(self.stdscr, data, y+ywinscroll))
+                    resetView(self.stdscr, data, y)
 
         elif key in [43, 97, 65]: #+, a
-            #stdscr.move(y, scrollx)
-            data = sortData(stdscr, makeNew(stdscr, data, y, ywinscroll))
-            data = editMode(stdscr, data, y+ywinscroll)
-            resetView(stdscr, data, y)
-            #wr(stdscr, "Enter", stdscr.getmaxyx()[0]-1)
-            #stdscr.move(y, scrollx)
+            #self.stdscr.move(y, scrollx)
+            data = sortData(self.stdscr, makeNew(self.stdscr, data, y, ywinscroll))
+            data = editMode(self.stdscr, data, y+ywinscroll)
+            resetView(self.stdscr, data, y)
+            #wr(self.stdscr, "Enter", self.stdscr.getmaxyx()[0]-1)
+            #self.stdscr.move(y, scrollx)
         elif xwinscroll <= 0 and (key in [100, 68] or key in Keybinds.backspace or key in Keybinds.delete): #backspace, d, delete
-            data = youSurePrompt(stdscr, storage, data, y+ywinscroll)
+            data = youSurePrompt(self.stdscr, storage, data, y+ywinscroll)
         elif key in [114, 82]: #r
             xwinscroll = 0
             ywinscroll = 0
-            resetView(stdscr, data)
-        elif key in [104, 72]: #h
-            helpfunc(stdscr, storage, data)
+            resetView(self.stdscr, data)
+        elif key in     
+            helpfunc(self.stdscr, storage, data)
         # elif key in [115, 83]: #s
-        #     resetView(stdscr, data)
-        #     currentList, listnames = getname(stdscr, fulldata)
-        #     data = readData(stdscr, storage)
-        #     resetView(stdscr, data)
+        #     resetView(self.stdscr, data)
+        #     currentList, listnames = getname(self.stdscr, fulldata)
+        #     data = readData(self.stdscr, storage)
+        #     resetView(self.stdscr, data)
         #     j = 0
 
         elif key in [110, 78]: #n
-            #rename(stdscr, data)
+            #rename(self.stdscr, data)
             pass
             # Nothing here
         elif xwinscroll == 0 and (key in Keybinds.enter or key in [101, 69]): #enter, e
-            #wr(stdscr, "Space", stdscr.getmaxyx()[0]-1, "force")
-            data = editMode(stdscr, data, y+ywinscroll)
-            #stdscr.move(y, scrollx)
-            resetView(stdscr, data, y)
+            #wr(self.stdscr, "Space", self.stdscr.getmaxyx()[0]-1, "force")
+            data = editMode(self.stdscr, data, y+ywinscroll)
+            #self.stdscr.move(y, scrollx)
+            resetView(self.stdscr, data, y)
         elif key in [113, 81, 120, 88, 27, 24]: #q, x og Esc, ctrl+x
-            resetView(stdscr, data)
-            data = sortData(stdscr, data)
-            writeData(stdscr, storage, fulldata, currentList, data)
+            resetView(self.stdscr, data)
+            data = sortData(self.stdscr, data)
+            writeData(self.stdscr, storage, fulldata, currentList, data)
             cont = False
         else:
-            #alert(stdscr, str(type(key)) + ":" + str(key))
+            #alert(self.stdscr, str(type(key)) + ":" + str(key))
             pass
 
         j += 1
-        #alert(stdscr, "Scroll:                      " + str(xwinscroll))
+        #alert(self.stdscr, "Scroll:                      " + str(xwinscroll))
 
-        stdscr.refresh()
+        self.stdscr.refresh()
 
 
 def main(stdscr):
