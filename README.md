@@ -1,6 +1,11 @@
 # Todo
 
 Small todo list program written in python 3 using the curses library
+## Install
+
+```sh
+curl https://raw.githubusercontent.com/SanderGodard/todo/refs/heads/main/install.sh | bash
+```
 
 ## Details
 
