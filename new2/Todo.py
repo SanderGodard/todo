@@ -3,6 +3,7 @@ import curses as c
 import sys
 from os import path, mkdir
 import json
+import argparse
 
 # Updated imports to reflect renaming
 from lib.DataStore import TodoParse
@@ -19,15 +20,17 @@ class Todo:
         # Start curses environment
         c.wrapper(self.run_app)
 
+    def argparser(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-l', '--local', action='store_true', help='Enable local note storage for cwd')
+        return parser.parse_args()
+
     def run_app(self, stdscr):
         """Initializes and runs the curses application."""
+        self.args = self.argparser()
         self.app = App(stdscr)
         # Pass the loaded data store to the application controller
         self.app.start(self.todo)
-
-    # These methods are for potential debugging/external access, but the App class handles the actual runtime logic
-    def getEntryLists(self):
-        return self.todo.getEntryLists()
 
     def __str__(self):
         return f"{self.__class__.__name__}(Storage: {self.todo.storage}, Lists: {len(self.todo.entryLists)})"
