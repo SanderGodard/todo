@@ -4,6 +4,6 @@
 
 
 
-git clone https://github.com/SanderGodard/todo.git
+git clone git@github.com:SanderGodard/todo.git
 cd todo
 sudo ln -s $(pwd)/todo.py /usr/bin/todo
