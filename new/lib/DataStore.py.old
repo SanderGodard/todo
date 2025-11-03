@@ -1,0 +1,128 @@
+#!/bin/python3
+from os import path, mkdir
+import json
+from time import time
+
+# Relative imports assuming this is run within a lib package
+from .Constants import Flairs
+from .Entry import Entry
+from .EntryList import EntryList
+
+
+class TodoParse:
+    """
+    Handles loading, saving, and structure management of the Todo data.
+    Acts as the main container for all EntryList objects.
+    """
+    def __init__(self):
+        self.entryLists = []
+        self.storage = None
+
+
+    def validateStorage(self):
+        """Defines the storage path and creates the file/directory if necessary."""
+        if self.storage is not None:
+            return
+        
+        storageFileName = "storage.json"
+        
+        try:
+            # Use home directory for config
+            home = path.expanduser("~") + "/"
+        except:
+            print(f"{Flairs.err} Could not find home folder, putting in current directory")
+            home = "./"
+
+        confFolder = home + ".todo/" # Changed folder name for safety
+        self.storage = confFolder + storageFileName
+
+        # Now validate that it is accessible
+        if not path.exists(self.storage):
+            if not path.exists(confFolder):
+                try:
+                    mkdir(confFolder)
+                except OSError as e:
+                    print(f"{Flairs.err} Could not create directory {confFolder}: {e}")
+                    # Fallback to local file
+                    self.storage = storageFileName
+            
+            # Create a default list if the storage file doesn't exist
+            if not path.exists(self.storage):
+                self.addEntryList(EntryList(self, name="Default Todo List"))
+                self.save()
+
+
+    def addEntryList(self, entrylist=None):
+        """Adds an EntryList object to the main list."""
+        if entrylist is None:
+            # Create a new default EntryList if none is provided
+            entrylist = EntryList(parent=self)
+            entrylist.addEntry() # Ensure a new list has at least one entry
+            
+        entrylist.parent = self # Set/update parent reference
+        self.entryLists.append(entrylist)
+
+
+    def load(self):
+        """Loads data from the storage JSON file."""
+        self.validateStorage()
+        
+        try:
+            with open(self.storage, "r") as file:
+                jsonObject = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            jsonObject = {} # Start fresh if file is missing or corrupted
+
+        self.entryLists = [] # Start with clean slate
+        
+        for list_name, entries_data in jsonObject.items():
+            eL = EntryList(self, name=list_name)
+            
+            # Load entries for the list
+            for eDict in entries_data:
+                # Safe loading with defaults
+                text = eDict.get("text", "Error loading entry")
+                flair = eDict.get("flair", Flairs.tsk)
+                time_val = eDict.get("time", int(time()))
+                
+                e = Entry(eL, text=text, flair=flair, time=time_val)
+                eL.addEntry(e)
+            
+            self.addEntryList(eL)
+
+        # Ensure we have at least one list loaded
+        if not self.entryLists:
+            self.addEntryList(EntryList(self, name="My Tasks"))
+
+
+    def jsonify(self):
+        """Converts the internal data structure to a JSON serializable dictionary."""
+        jsonObject = {}
+        for eL in self.getEntryLists():
+            # Use the list name as the dictionary key
+            jsonObject[eL.getName()] = []
+            for entry in eL.getEntries():
+                jsonObject[eL.getName()].append(entry.json())
+        return jsonObject
+
+
+    def save(self):
+        """Saves the current data state to the storage file."""
+        self.validateStorage()
+        try:
+            with open(self.storage, "w") as file:
+                json_data = json.dumps(self.jsonify(), indent=4)
+                file.write(json_data)
+        except IOError as e:
+            print(f"{Flairs.err} Could not save data to {self.storage}: {e}", file=sys.stderr)
+
+    def getEntryLists(self):
+        # Sort lists by the most recently modified entry
+        return sorted(self.entryLists, key=lambda el: el.getSortKey(), reverse=True)
+
+
+    def __str__(self):
+        return f"{self.__class__.__name__}({self.storage=}, {len(self.entryLists)=})"
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}>"
