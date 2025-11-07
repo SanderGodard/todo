@@ -1,0 +1,1 @@
+Make entries right below cursor, when adding new. Make flair of edit prompt yellow. Edit on press enter., Håndtere UF-8 chars.
