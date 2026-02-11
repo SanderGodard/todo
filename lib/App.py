@@ -41,11 +41,12 @@ class App:
 
         # Input settings
         self.set_shorter_esc_delay_in_os()
+        c.initscr()
         c.curs_set(2)
         c.noecho()
 
         # Functions for printing to screen
-        self.listview = Listview()
+        self.listview = Listview(self)
 
     def _setup_colors(self):
         """Initialize color pairs for drawing."""
@@ -61,13 +62,7 @@ class App:
         environ.setdefault('ESCDELAY', '25')
 
 
-    def cleanInp(self, inp):
-        dict = {165:229, 133:197, 184:248, 152:216, 166:230, 134:198}
-        if inp in dict:
-            inp = dict[inp]
-        elif inp == 195: #Ã
-            inp = False
-        return inp
+
 
 
     def displayHelp(self):
