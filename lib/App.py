@@ -46,7 +46,7 @@ class App:
         c.noecho()
 
         # Functions for printing to screen
-        self.listview = Listview(self)
+        self.listview = Listview()
 
     def _setup_colors(self):
         """Initialize color pairs for drawing."""
