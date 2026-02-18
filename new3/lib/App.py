@@ -1,6 +1,8 @@
 #!/bin/python3
 import curses as c
 import os
+import signal
+from os import path
 
 # Updated imports
 from .Constants import Keybinds, Flairs, FlairSymbols, ColorPairs
@@ -25,6 +27,8 @@ class App:
         self.currentScreen = 0
         self.chosenEntryList = None
         self.storage_path = storage_path
+        self._sigint_received = False
+        self.config = {}
 
         # View state
         self.cursor_y = 0
@@ -38,6 +42,8 @@ class App:
         c.curs_set(0) # Invisible cursor normally
         c.noecho() # Don't echo input
 
+        # Load config before colors so color settings can be applied
+        self._load_config()
         self._setup_colors()
 
         self.listview = Rendering(self)
@@ -45,6 +51,63 @@ class App:
     def set_shorter_esc_delay_in_os(self):
         """Sets the delay for ESC key to prevent input lag."""
         os.environ.setdefault('ESCDELAY', '25')
+
+    def _load_config(self):
+        """Load or create ~/.todo/config as simple KEY=VALUE env-style file."""
+        config = {}
+        try:
+            home = path.expanduser('~') + '/'
+        except Exception:
+            home = './'
+        conf_dir = path.join(home, '.todo')
+        conf_file = path.join(conf_dir, 'config')
+        # Ensure directory exists
+        if not path.exists(conf_dir):
+            try:
+                os.mkdir(conf_dir)
+            except Exception:
+                pass
+
+        # If missing, create default config with comments
+        if not path.exists(conf_file):
+            default = (
+                "# ~/.todo/config - simple KEY=VALUE pairs\n"
+                "# status_bar_color: color name (black, red, green, yellow, blue, magenta, cyan, white)\n"
+                "# divider: string used between status modules\n"
+                "# status_bar_format: python format string using {divider}, {list}, {storage_file}, {keybinds}, {position}\n"
+                "# Examples:\n"
+                "# status_bar_color=magenta\n"
+                "# divider=|\n"
+                "# status_bar_format= {list} {divider} {position} {divider} {storage_file} \n"
+            )
+            try:
+                with open(conf_file, 'w') as fh:
+                    fh.write(default)
+            except Exception:
+                pass
+
+        # Read file
+        try:
+            with open(conf_file, 'r') as fh:
+                for raw in fh.readlines():
+                    line = raw.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    if '=' in line:
+                        k, v = line.split('=', 1)
+                        config[k.strip()] = v.strip()
+        except Exception:
+            pass
+
+        # Apply defaults
+        if 'divider' not in config:
+            config['divider'] = '|'
+        if 'status_bar_format' not in config:
+            config['status_bar_format'] = ' {list} {divider} {position} {divider} {storage_file} '
+        if 'status_bar_color' not in config:
+            config['status_bar_color'] = 'magenta'
+
+        self.config = config
 
     def _setup_colors(self):
         """Initialize color pairs for drawing based on FlairSymbols."""
@@ -59,6 +122,23 @@ class App:
 
             # 2. Initialize a separate pair for main text (transparent BG, standard FG)
             c.init_pair(ColorPairs.DEFAULT_TEXT, c.COLOR_WHITE, FlairSymbols.BG_COLOR)
+            # 3. Optionally apply configured status bar color -> create pair id 10
+            color_name = self.config.get('status_bar_color', 'magenta').lower()
+            color_map = {
+                'black': c.COLOR_BLACK,
+                'red': c.COLOR_RED,
+                'green': c.COLOR_GREEN,
+                'yellow': c.COLOR_YELLOW,
+                'blue': c.COLOR_BLUE,
+                'magenta': c.COLOR_MAGENTA,
+                'cyan': c.COLOR_CYAN,
+                'white': c.COLOR_WHITE,
+            }
+            status_fg = color_map.get(color_name, c.COLOR_MAGENTA)
+            try:
+                c.init_pair(10, status_fg, FlairSymbols.BG_COLOR)
+            except Exception:
+                pass
 
     def _flatten_data(self):
         """
@@ -135,21 +215,53 @@ class App:
     def _handle_navigation(self, key):
         """Handles cursor movement and scrolling."""
         initial_cursor = self.cursor_y
-
+        # Wrap-around: up from 0 goes to last, down from last goes to 0
         if key in Keybinds.UP:
             if self.cursor_y > 0:
                 self.cursor_y -= 1
+            else:
+                # wrap to bottom
+                self.cursor_y = max(0, len(self.flat_items) - 1)
 
         elif key in Keybinds.DOWN:
             if self.cursor_y < len(self.flat_items) - 1:
                 self.cursor_y += 1
+            else:
+                # wrap to top
+                self.cursor_y = 0
+
+        # Home / End quick jumps
+        elif key in Keybinds.HOME:
+            self.cursor_y = 0
+        elif key in Keybinds.END:
+            self.cursor_y = max(0, len(self.flat_items) - 1)
 
         elif key in Keybinds.LEFT:
             self.scroll_x = max(0, self.scroll_x - 4)
         elif key in Keybinds.RIGHT:
             self.scroll_x += 4
 
-        if initial_cursor != self.cursor_y or key in Keybinds.LEFT or key in Keybinds.RIGHT:
+        elif key in Keybinds.ctrlleft or key in Keybinds.SHIFT_LEFT:
+            item = self._get_selected_item()
+            if item:
+                text = item.getTitle()
+                pos = self.scroll_x - 1
+                while pos > 0 and text[pos] != ' ':
+                    pos -= 1
+                self.scroll_x = max(0, pos)
+        elif key in Keybinds.ctrlright or key in Keybinds.SHIFT_RIGHT:
+            item = self._get_selected_item()
+            if item:
+                text = item.getTitle()
+                pos = self.scroll_x
+                while pos < len(text) and text[pos] != ' ':
+                    pos += 1
+                if pos < len(text):
+                    self.scroll_x = pos + 1  # after the space
+                else:
+                    self.scroll_x = len(text)
+
+        if initial_cursor != self.cursor_y or key in Keybinds.LEFT or key in Keybinds.RIGHT or key in Keybinds.SHIFT_LEFT or key in Keybinds.SHIFT_RIGHT or key in Keybinds.ctrlleft or key in Keybinds.ctrlright:
             self._flatten_data()
             self._needs_redraw = True
 
@@ -158,18 +270,15 @@ class App:
         item = self._get_selected_item()
         if not item:
             return
-
         item.delete()
 
         if self.currentScreen == 0 and not self.data_store.getEntryLists():
             # If all lists are deleted, create a new default one
             self.data_store.addEntryList()
 
-        elif self.currentScreen == 1 and self.chosenEntryList and not self.chosenEntryList.getEntries():
-            # If all entries are deleted, go back to list view
-            self.currentScreen = 0
-            self.chosenEntryList = None
+        # If entries go to zero, remain in the current list view (do not auto-exit)
 
+        # Adjust cursor and redraw
         self.cursor_y = max(0, self.cursor_y - 1)
         self._flatten_data()
         self._needs_redraw = True
@@ -179,10 +288,13 @@ class App:
         if self.currentScreen == 0:
             self.data_store.addEntryList()
         elif self.currentScreen == 1 and self.chosenEntryList:
-            self.chosenEntryList.addEntry()
+            # Insert new entry directly under the cursor
+            insert_pos = self.cursor_y + 1
+            self.chosenEntryList.addEntry(entry=insert_pos)
 
         self._flatten_data()
-        self.cursor_y = len(self.flat_items) - 1
+        # place cursor on the newly added entry
+        self.cursor_y = min(len(self.flat_items)-1, insert_pos if self.currentScreen==1 else len(self.flat_items)-1)
         self._needs_redraw = True
 
 
@@ -277,8 +389,8 @@ class App:
                 # Escape reverts changes
                 break
             elif key in Keybinds.ENTER:
-                if new_text.strip():
-                    item.edit(new_text.strip())
+                # Allow empty entries and lists
+                item.edit(new_text)
                 # If editing a list, make sure to reload the lists in case of sorting by name
                 if item_type == 'list':
                     self.data_store.getEntryLists()
@@ -290,31 +402,63 @@ class App:
             elif key in Keybinds.delete:
                 if cursor_pos < len(new_text):
                     new_text = new_text[:cursor_pos] + new_text[cursor_pos+1:]
-            elif key == 9:  # Ctrl+Backspace - Delete word before cursor
+            elif key in Keybinds.ctrl_backspace:  # Delete word before cursor
                 if cursor_pos > 0:
-                    # Find the start of the word before cursor
                     word_start = cursor_pos - 1
-                    # Skip spaces before the word
-                    while word_start > 0 and new_text[word_start] == ' ':
+                    # If we're in a word, skip back to start of word
+                    if word_start >= 0 and new_text[word_start] != ' ':
+                        while word_start > 0 and new_text[word_start - 1] != ' ':
+                            word_start -= 1
+                    # Skip any spaces before the word
+                    while word_start > 0 and new_text[word_start - 1] == ' ':
                         word_start -= 1
-                    # Skip the word itself
-                    while word_start > 0 and new_text[word_start - 1] != ' ':
-                        word_start -= 1
-                    # Delete the word
                     new_text = new_text[:word_start] + new_text[cursor_pos:]
                     cursor_pos = word_start
-            elif key == 520:  # Ctrl+Delete - Delete word at/after cursor
+            elif key in Keybinds.ctrl_delete:  # Delete word at/after cursor
                 if cursor_pos < len(new_text):
-                    # Find the end of the current word
                     word_end = cursor_pos
                     # Skip current word
                     while word_end < len(new_text) and new_text[word_end] != ' ':
                         word_end += 1
-                    # Skip spaces after the word
+                    # Skip spaces after word
                     while word_end < len(new_text) and new_text[word_end] == ' ':
                         word_end += 1
-                    # Delete the word
                     new_text = new_text[:cursor_pos] + new_text[word_end:]
+            elif key in Keybinds.ctrlleft:
+                # Move cursor to start of previous word
+                if cursor_pos > 0:
+                    new_pos = cursor_pos - 1
+                    # Skip spaces before cursor
+                    while new_pos > 0 and new_text[new_pos] == ' ':
+                        new_pos -= 1
+                    # Skip word itself to reach its start
+                    while new_pos > 0 and new_text[new_pos - 1] != ' ':
+                        new_pos -= 1
+                    cursor_pos = new_pos
+            elif key in Keybinds.ctrlright:
+                # Move cursor to start of next word
+                if cursor_pos < len(new_text):
+                    new_pos = cursor_pos
+                    # Skip current word
+                    while new_pos < len(new_text) and new_text[new_pos] != ' ':
+                        new_pos += 1
+                    # Skip spaces to reach next word
+                    while new_pos < len(new_text) and new_text[new_pos] == ' ':
+                        new_pos += 1
+                    cursor_pos = new_pos
+            elif key == 9:  # Tab: insert 4 spaces at start of line
+                new_text = (' ' * 4) + new_text
+                cursor_pos += 4
+            elif key == c.KEY_BTAB:  # Shift+Tab: remove up to 4 leading spaces
+                remove = 0
+                for i in range(min(4, len(new_text))):
+                    if new_text[i] == ' ':
+                        remove += 1
+                    else:
+                        break
+                if remove > 0:
+                    new_text = new_text[remove:]
+                    cursor_pos = max(0, cursor_pos - remove)
             elif key == c.KEY_LEFT:
                 cursor_pos = max(0, cursor_pos - 1)
             elif key == c.KEY_RIGHT:
@@ -338,9 +482,13 @@ class App:
 
     def cleanInput(self, inp):
         dict = {165:229, 133:197, 184:248, 152:216, 166:230, 134:198}
-        if ord(inp) in dict:
-            inp = chr(dict[ord(inp)])
-        elif ord(inp) == 195: #Ã
+        try:
+            code = ord(inp)
+        except Exception:
+            return inp
+        if code in dict:
+            inp = chr(dict[code])
+        elif code == 195: #Ã
             inp = False
         return inp
 
@@ -365,12 +513,12 @@ class App:
 
     def handle_input(self, key):
         """Processes a single keypress event."""
-        # Handle item movement (Shift+Arrows)
+        # Handle item movement (Shift+Up/Down for reordering)
         if key in Keybinds.SHIFT_UP or key in Keybinds.SHIFT_DOWN:
             self._handle_move(key)
             return True
 
-        if key in Keybinds.UP or key in Keybinds.DOWN or key in Keybinds.LEFT or key in Keybinds.RIGHT:
+        if key in Keybinds.UP or key in Keybinds.DOWN or key in Keybinds.LEFT or key in Keybinds.RIGHT or key in Keybinds.HOME or key in Keybinds.END or key in Keybinds.ctrlleft or key in Keybinds.ctrlright or key in Keybinds.SHIFT_LEFT or key in Keybinds.SHIFT_RIGHT:
             self._handle_navigation(key)
 
         if key in Keybinds.ADD:
@@ -380,8 +528,25 @@ class App:
         if key in Keybinds.DELETE_ITEM or key in Keybinds.delete or key in Keybinds.backspace:
             self._handle_delete()
 
-        if key in Keybinds.RENAME or key in Keybinds.EDIT or (self.currentScreen == 1 and key in Keybinds.ENTER):
+        # Allow 'i' to edit in addition to 'e' and 'r'
+        if key in Keybinds.RENAME or key in Keybinds.EDIT or key == ord('i') or (self.currentScreen == 1 and key in Keybinds.ENTER):
             self._handle_rename_or_edit()
+
+        # Tab/Shift-Tab outside edit mode: indent/unindent current entry's text
+        if key == 9:  # Tab
+            if self.currentScreen == 1:
+                sel = self._get_selected_item()
+                if sel:
+                    sel.text = (' ' * 4) + sel.text
+                    self._needs_redraw = True
+            return True
+        if key == c.KEY_BTAB:  # Shift+Tab
+            if self.currentScreen == 1:
+                sel = self._get_selected_item()
+                if sel and sel.text.startswith('    '):
+                    sel.text = sel.text[4:]
+                    self._needs_redraw = True
+            return True
 
         if self.currentScreen == 0:
             if key in Keybinds.ENTER: # or key in Keybinds.RIGHT:
@@ -414,6 +579,11 @@ class App:
         self._flatten_data()
         self.window.nodelay(False)  # Blocking input: wait for keystroke
 
+        # Setup SIGINT -> soft close
+        def _sigint_handler(signum, frame):
+            self._sigint_received = True
+        signal.signal(signal.SIGINT, _sigint_handler)
+
         # Draw initial screen before waiting for input
         self.listview.draw(self.flat_items, self.cursor_y, self.scroll_y, self.scroll_x, self.is_editing)
         self.window.refresh()
@@ -437,6 +607,10 @@ class App:
             if key != c.ERR and key != -1:
                 running = self.handle_input(key)
                 # Input was received, we'll redraw below if needed
+
+            # Check for SIGINT
+            if getattr(self, '_sigint_received', False):
+                running = False
 
             # 3. Rendering - Only draw if something has changed or key was pressed
             if self._needs_redraw and not self.is_editing:

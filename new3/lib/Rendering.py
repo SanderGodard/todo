@@ -122,8 +122,13 @@ class Rendering:
         
         # --- Draw Status Bar ---
         status_text = self._get_status_text(cursor_y, len(items), scroll_y)
-        self.window.attrset(c.A_NORMAL | c.color_pair(FlairSymbols.COLOR_MAP[Flairs.inf]) | c.A_REVERSE)
-        
+        # Use configured status bar color pair (pair id 10) if available
+        try:
+            status_pair = c.color_pair(10)
+        except Exception:
+            status_pair = c.A_NORMAL
+
+        self.window.attrset(c.A_NORMAL | status_pair | c.A_REVERSE)
         # Truncate to max_x - 1 and pad to cover the entire line safely
         status_line_content = status_text[:max_x - 1].ljust(max_x - 1)
         self.window.addstr(max_y - 1, 0, status_line_content)
@@ -132,28 +137,28 @@ class Rendering:
     def _get_status_text(self, cursor_y, total_items, scroll_y):
         """Constructs the text for the bottom status bar."""
         app = self.app
+        # Prepare context variables for formatting
         if app.currentScreen == 0:
-            header = "MAIN" 
+            list_name = "MAIN"
         else:
             list_name = app.chosenEntryList.getName() if app.chosenEntryList else "Unknown"
-            header = f"LIST: {list_name}"
 
-        # Display the storage path
-        storage_info = ""
-        if app.storage_path:
-            import os
-            storage_info = f" | File: {app.storage_path}"
-        else:
-            storage_info = f" | File: ~/.todo/storage.json"
-        
-        pos_text = f"Pos: {cursor_y + 1}/{total_items}" if total_items > 0 else "Pos: 0/0"
+        storage_file = app.storage_path if app.storage_path else "~/.todo/storage.json"
+        position = f"Pos: {cursor_y + 1}/{total_items}, X: {app.scroll_x}"
 
-        # Instructions based on screen
-        if app.currentScreen == 1:
-            instructions = "a: Add | d/DEL: Del | r/e: Edit | SPC: Flip | x/q/ESC: Back | S^/Sv: Move"
-        else:
-            instructions = "a: Add | d/DEL: Del | r/e: Edit | ENTER: Open | x/q/ESC: Quit"
-        
-        status_line = f" {header}{storage_info} | {instructions} | {pos_text}"
-        
+        keybinds_hint = "-k for help"
+
+        divider = app.config.get('divider', '|')
+
+        # Default status format (can be overridden via config)
+        fmt = app.config.get('status_bar_format', " {list} {divider} {position} {divider} {storage_file} ")
+
+        status_line = fmt.format(
+            divider=divider,
+            list=list_name,
+            storage_file=storage_file,
+            keybinds=keybinds_hint,
+            position=position
+        )
+
         return status_line

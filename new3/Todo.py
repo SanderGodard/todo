@@ -28,6 +28,9 @@ class Todo:
         self.todo = TodoParse(storage_path=self.storage_path)
         self.todo.load()
 
+        # Ensure ESCDELAY is set early so Escape is responsive
+        os.environ.setdefault('ESCDELAY', '25')
+
         # Start curses environment
         c.wrapper(self.run_app)
 
@@ -76,29 +79,31 @@ COMMON KEYBINDS (All Screens)
   
 LIST SELECTION SCREEN (Screen 0)
 ─────────────────────────────────────────────────────────────────────────────
-  j, s, Down        Move cursor down
-  k, w, Up          Move cursor up
+  j, s, Down        Move cursor down (wraps around)
+  k, w, Up          Move cursor up (wraps around)
+  Home              Jump to first list
+  End               Jump to last list
   
   + or a, A         Add a new list
   d or D            Delete current list (will ask for confirmation)
   Backspace, Del    Delete current list (will ask for confirmation)
   
-  r or R            Rename current list
-  e or E            Edit list name
+  r, R, e, E, i     Edit (rename list or entry text)
   
   Enter             Open the selected list (switch to entry view)
   
 ENTRY VIEW SCREEN (Screen 1)
 ─────────────────────────────────────────────────────────────────────────────
-  j, s, Down        Move cursor down
-  k, w, Up          Move cursor up
+  j, s, Down        Move cursor down (wraps around)
+  k, w, Up          Move cursor up (wraps around)
+  Home              Jump to first entry
+  End               Jump to last entry
   
   + or a, A         Add a new entry to current list
   d or D            Delete entry at cursor
   Backspace, Del    Delete entry at cursor
   
-  r or R            Edit entry text
-  e or E            Edit entry text
+  r, R, e, E, i     Edit (rename list or entry text)
   Enter             Edit entry text (in entry view)
   
   Space             Toggle entry flair (cycle through states)
@@ -106,13 +111,21 @@ ENTRY VIEW SCREEN (Screen 1)
   Shift + Up        Move entry up in list
   Shift + Down      Move entry down in list
   
+  Tab               Indent entry (add 4 spaces at start)
+  Shift+Tab         Unindent entry (remove up to 4 spaces from start)
+  
 EDITING SCREEN (When editing entry/list text)
 ─────────────────────────────────────────────────────────────────────────────
   Left, Right       Move cursor within text
+  Ctrl+Left         Move cursor to previous word
+  Ctrl+Right        Move cursor to next word
   Backspace         Delete character before cursor
   Delete            Delete character at cursor
   Ctrl+Backspace    Delete entire word before cursor
-  Ctrl+Delete       Delete entire word at cursor
+  Ctrl+Delete       Delete entire word at/after cursor
+  
+  Tab               Insert 4 spaces at start of line
+  Shift+Tab         Remove up to 4 spaces from start of line
   
   Enter             Save changes
   Escape, Ctrl+X    Cancel editing (revert changes)

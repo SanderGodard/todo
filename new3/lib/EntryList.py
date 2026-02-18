@@ -21,10 +21,37 @@ class EntryList:
 
 
     def addEntry(self, entry=None):
-        """Adds a new Entry object to the list."""
-        if entry is None:
-            entry = Entry(parent=self) 
-        self.entries.append(entry)
+        """Adds a new Entry object to the list.
+
+        If `position` is provided (int), the entry will be inserted at that index.
+        Otherwise the entry is appended.
+        """
+        # signature compatibility: allow addEntry(entry=None, position=None)
+        # Some callers may pass a position via keyword; accept via attribute lookup
+        try:
+            position = entry.position if entry and hasattr(entry, 'position') else None
+        except Exception:
+            position = None
+
+        if entry is None or isinstance(entry, Entry):
+            if entry is None:
+                entry = Entry(parent=self)
+            if position is None:
+                self.entries.append(entry)
+            else:
+                # clamp position
+                pos = max(0, min(position, len(self.entries)))
+                self.entries.insert(pos, entry)
+        else:
+            # If caller passed (position=int) via second param style, support that
+            if isinstance(entry, int):
+                pos = max(0, min(entry, len(self.entries)))
+                new_entry = Entry(parent=self)
+                self.entries.insert(pos, new_entry)
+            else:
+                # Fallback: append
+                new_entry = Entry(parent=self)
+                self.entries.append(new_entry)
         
         
     def move_entry(self, old_index, direction):
