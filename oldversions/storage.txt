@@ -1,3 +1,0 @@
-#Run todo
-/Press 'h' for instructions
-/-
