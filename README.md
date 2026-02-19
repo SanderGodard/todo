@@ -9,6 +9,14 @@ Small todo list program written in python 3 using the curses library
 curl https://raw.githubusercontent.com/SanderGodard/todo/refs/heads/main/install.sh | bash
 ```
 
+## Future work
+### Rofi integration possible?
+```bash
+rofi -no-laz-grab -sep "|" -dmenu -i -p 'Todo ' -mesg "$(./rofi_output.py -mesg)" <<< $(./rofi_output.py)
+
+rofi -no-laz-grab -sep "|" -dmenu -i -p 'Todo ' -mesg "$(./rofi_output.py -mesg)" <<< $(./rofi_output.py -list general)
+```
+
 ## Overview
 Written in python, uses json to store and work with the data
 
