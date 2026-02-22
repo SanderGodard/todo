@@ -39,6 +39,10 @@ class App:
         self.is_editing = False
         self._needs_redraw = True # Flag to prevent unnecessary redraws (flickering fix)
 
+        # Confirmation state
+        self.confirm_delete = False
+        self.confirm_item = None
+
         self.set_shorter_esc_delay_in_os()
         c.curs_set(0) # Invisible cursor normally
         c.noecho() # Don't echo input
@@ -271,19 +275,20 @@ class App:
         item = self._get_selected_item()
         if not item:
             return
-        item.delete()
-
-        if self.currentScreen == 0 and not self.data_store.getEntryLists():
-            # If all lists are deleted, create a new default one
-            self.data_store.addEntryList()
-
-        # If entries go to zero, remain in the current list view (do not auto-exit)
-
-        # Adjust cursor and redraw
-        self._flatten_data()
-        # If cursor was beyond the new list length, move it to the last item
-        self.cursor_y = min(self.cursor_y, len(self.flat_items) - 1)
-        self._needs_redraw = True
+        item_type = self._get_selected_item_type()
+        
+        if item_type == 'list':
+            # Show confirmation for deleting lists
+            self.confirm_delete = True
+            self.confirm_item = item
+            self._needs_redraw = True
+        else:
+            # Delete entries directly without confirmation
+            item.delete()
+            self._flatten_data()
+            # If cursor was beyond the new list length, move it to the last item
+            self.cursor_y = min(self.cursor_y, len(self.flat_items) - 1)
+            self._needs_redraw = True
 
     def _handle_add(self):
         """Adds a new list or entry."""
@@ -298,6 +303,14 @@ class App:
         # place cursor on the newly added entry
         self.cursor_y = min(len(self.flat_items)-1, insert_pos if self.currentScreen==1 else len(self.flat_items)-1)
         self._needs_redraw = True
+
+        # Force redraw to show the new entry before editing
+        self.listview.draw(self.flat_items, self.cursor_y, self.scroll_y, self.scroll_x, self.is_editing)
+        self.window.refresh()
+
+        # Auto-edit the newly added entry
+        if self.currentScreen == 1:
+            self._handle_rename_or_edit()
 
 
     def _handle_rename_or_edit(self):
@@ -394,7 +407,7 @@ class App:
                 break
             elif key in Keybinds.ENTER:
                 # Allow empty entries and lists
-                item.edit(new_text.lstrip())  # Strip leading space when saving
+                item.edit(new_text[1:] if new_text.startswith(' ') else new_text)  # Strip only the leading space when saving
                 # If editing a list, make sure to reload the lists in case of sorting by name
                 if item_type == 'list':
                     self.data_store.getEntryLists()
@@ -517,6 +530,25 @@ class App:
 
     def handle_input(self, key):
         """Processes a single keypress event."""
+        # Handle delete confirmation
+        if self.confirm_delete:
+            if key == ord('y') or key == ord('Y'):
+                # Proceed with deletion
+                item = self.confirm_item
+                item.delete()
+                if self.currentScreen == 0 and not self.data_store.getEntryLists():
+                    # If all lists are deleted, create a new default one
+                    self.data_store.addEntryList()
+                self._flatten_data()
+                # If cursor was beyond the new list length, move it to the last item
+                self.cursor_y = min(self.cursor_y, len(self.flat_items) - 1)
+                self._needs_redraw = True
+            # Cancel on 'n', 'N', or ESC
+            self.confirm_delete = False
+            self.confirm_item = None
+            self._needs_redraw = True
+            return True
+
         # Handle item movement (Shift+Up/Down for reordering)
         if key in Keybinds.SHIFT_UP or key in Keybinds.SHIFT_DOWN:
             self._handle_move(key)
@@ -574,7 +606,6 @@ class App:
 
         return True
 
-    # Main Loop
     def start(self, data_store):
         """
         Main application loop. Updates only on keystroke or terminal resize.

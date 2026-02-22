@@ -82,15 +82,15 @@ COMMON KEYBINDS (All Screens)
   L, Right              Navigate right (horizontal scrolling)
   J, S, Down            Move cursor down (wraps around)
   K, W, Up              Move cursor up (wraps around)
-  Home                  Jump to first list
-  End                   Jump to last list
+  Home                  Jump to first entry
+  End                   Jump to last entry
 
   Q, X, Esc, Ctrl+X     Go back (exit entry view or quit app)
   
   +, A                  Add a new entry at cursor
   D, Del, Backspace     Delete entry at cursor
   
-  R, E, I, Enter        Edit entry
+  R, E, I, Enter        Edit entry (See EDITING SCREEN for details)
 
 LIST SELECTION SCREEN (Screen 0)
 ─────────────────────────────────────────────────────────────────────────────
@@ -116,8 +116,8 @@ EDITING SCREEN (When editing entry/list text)
   Ctrl/Shift+Delete     Delete entire word at/after cursor
   Ctrl/Shift+Backspace  Delete entire word at/after cursor
   
-  Tab                   Insert 4 spaces at start of line
-  Shift+Tab             Remove up to 4 spaces from start of line
+  Tab                   Indent entry (add 4 spaces at start)
+  Shift+Tab             Unindent entry (remove up to 4 spaces from start)
   
   Enter, Ctrl+O         Save changes
   Esc, Ctrl+X           Cancel editing (revert changes)

@@ -138,6 +138,11 @@ class Rendering:
         """Constructs the text for the bottom status bar."""
         import datetime
         app = self.app
+        
+        # Handle delete confirmation
+        if app.confirm_delete:
+            return f"Delete list '{app.confirm_item.getName()}'? (y/N)", 1  # Red color for confirmation prompt
+        
         # Prepare context variables for formatting
         if app.currentScreen == 0:
             list_name = "MAIN"

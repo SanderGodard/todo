@@ -5,7 +5,7 @@ from .Constants import Flairs
 
 class Entry:
     """Represents a single task or item within an EntryList."""
-    def __init__(self, parent, text="New entry", flair=Flairs.tsk, time=int(time())):
+    def __init__(self, parent, text="", flair=Flairs.tsk, time=int(time())):
         self.text = text
         self.flair = flair
         self.time = time
