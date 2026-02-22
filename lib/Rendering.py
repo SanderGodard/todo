@@ -40,13 +40,13 @@ class Rendering:
                 if item_type == 'list':
                     flair = Flairs.inf
                     flair_symbol = FlairSymbols.convert.get(flair, FlairSymbols.convert[Flairs.inf])
-                    text = f"{item.getTitle()}"
+                    text = f" {item.getTitle()}"
                     flair_color_pair = c.color_pair(FlairSymbols.COLOR_MAP.get(flair, c.COLOR_MAGENTA))
                 
                 else: # item_type == 'entry'
                     flair = item.getFlair()
                     flair_symbol = FlairSymbols.convert.get(flair, FlairSymbols.convert[Flairs.prt])
-                    text = f"{item.getTitle()}"
+                    text = f" {item.getTitle()}"
                     flair_color_pair = c.color_pair(FlairSymbols.COLOR_MAP.get(flair, c.COLOR_RED))
 
 
@@ -121,10 +121,10 @@ class Rendering:
 
         
         # --- Draw Status Bar ---
-        status_text = self._get_status_text(cursor_y, len(items), scroll_y)
+        status_text, status_bar_color = self._get_status_text(cursor_y, len(items))
         # Use configured status bar color pair (pair id 10) if available
         try:
-            status_pair = c.color_pair(10)
+            status_pair = c.color_pair(status_bar_color)
         except Exception:
             status_pair = c.A_NORMAL
 
@@ -134,24 +134,38 @@ class Rendering:
         self.window.addstr(max_y - 1, 0, status_line_content)
 
     
-    def _get_status_text(self, cursor_y, total_items, scroll_y):
+    def _get_status_text(self, cursor_y, total_items):
         """Constructs the text for the bottom status bar."""
         app = self.app
         # Prepare context variables for formatting
         if app.currentScreen == 0:
-            list_name = "MAIN"
+            list_name = "MENU"
         else:
             list_name = app.chosenEntryList.getName() if app.chosenEntryList else "Unknown"
 
         storage_file = app.storage_path if app.storage_path else "~/.todo/storage.json"
-        position = f"Pos: {cursor_y + 1}/{total_items}, X: {app.scroll_x}"
+        position = f"y: {cursor_y + 1}/{total_items}, x: {app.scroll_x}"
 
-        keybinds_hint = "-k for help"
+        keybinds_hint = "$ todo -k for help"
 
         divider = app.config.get('divider', '|')
 
+        # Get the status bar color pair id (same as the color constant)
+        color_name = app.config.get('status_bar_color', 'magenta').lower()
+        color_map = {
+            'black': c.COLOR_BLACK,
+            'red': c.COLOR_RED,
+            'green': c.COLOR_GREEN,
+            'yellow': c.COLOR_YELLOW,
+            'blue': c.COLOR_BLUE,
+            'magenta': c.COLOR_MAGENTA,
+            'cyan': c.COLOR_CYAN,
+            'white': c.COLOR_WHITE,
+        }
+        status_bar_color = color_map.get(color_name, c.COLOR_MAGENTA)
+
         # Default status format (can be overridden via config)
-        fmt = app.config.get('status_bar_format', " {list} {divider} {position} {divider} {storage_file} ")
+        fmt = app.config.get('status_bar_format', " {storage_file} {divider} List: {list} {divider} {position} {divider} {keybinds}")
 
         status_line = fmt.format(
             divider=divider,
@@ -161,4 +175,4 @@ class Rendering:
             position=position
         )
 
-        return status_line
+        return status_line, status_bar_color

@@ -2,6 +2,7 @@
 import curses as c
 import os
 import signal
+import datetime
 from os import path
 
 # Updated imports
@@ -122,7 +123,7 @@ class App:
 
             # 2. Initialize a separate pair for main text (transparent BG, standard FG)
             c.init_pair(ColorPairs.DEFAULT_TEXT, c.COLOR_WHITE, FlairSymbols.BG_COLOR)
-            # 3. Optionally apply configured status bar color -> create pair id 10
+            # 3. Optionally apply configured status bar color -> use the color value as pair id
             color_name = self.config.get('status_bar_color', 'magenta').lower()
             color_map = {
                 'black': c.COLOR_BLACK,
@@ -136,7 +137,7 @@ class App:
             }
             status_fg = color_map.get(color_name, c.COLOR_MAGENTA)
             try:
-                c.init_pair(10, status_fg, FlairSymbols.BG_COLOR)
+                c.init_pair(status_fg, status_fg, FlairSymbols.BG_COLOR)
             except Exception:
                 pass
 
@@ -279,8 +280,9 @@ class App:
         # If entries go to zero, remain in the current list view (do not auto-exit)
 
         # Adjust cursor and redraw
-        self.cursor_y = max(0, self.cursor_y - 1)
         self._flatten_data()
+        # If cursor was beyond the new list length, move it to the last item
+        self.cursor_y = min(self.cursor_y, len(self.flat_items) - 1)
         self._needs_redraw = True
 
     def _handle_add(self):
@@ -314,11 +316,11 @@ class App:
         # Calculate the length of the symbol/flair prefix to find the text start column
         if item_type == 'list':
             flair_symbol = FlairSymbols.convert.get(Flairs.inf, FlairSymbols.convert[Flairs.inf])
-            flair_symbol_len = len(flair_symbol)
+            flair_symbol_len = len(flair_symbol) + 1 # +1 for the space after the symbol
         elif item_type == 'entry':
             flair = item.getFlair()
             flair_symbol = FlairSymbols.convert.get(flair, FlairSymbols.convert[Flairs.tsk])
-            flair_symbol_len = len(flair_symbol)
+            flair_symbol_len = len(flair_symbol) + 1 # +1 for the space after the symbol
 
         # The text starts after the symbol, adjusted for horizontal scrolling (scroll_x)
         # edit_x is the screen column where the first editable character appears.
@@ -328,9 +330,9 @@ class App:
         if edit_x >= self.max_x - 1:
             return
 
-        initial_text = item.getTitle()
+        initial_text = f" {item.getTitle()}"  # Include leading space for consistent editing position
         new_text = initial_text
-        cursor_pos = len(new_text) # Cursor position within the `new_text` string
+        cursor_pos = 1  # Start cursor after the leading space
 
         # Set up terminal for editing
         self.is_editing = True
@@ -372,12 +374,14 @@ class App:
             # Truncate and pad the full line to ensure safe drawing
             line_to_draw = full_visible_line[:self.max_x - 1].ljust(self.max_x)
 
-            # Draw the line
-            self.window.addstr(edit_y, 0, line_to_draw, row_attr)
+            # Draw the line with PRT color for the prefix
+            prt_color_pair = c.color_pair(FlairSymbols.COLOR_MAP[Flairs.prt])
+            self.window.attrset(prt_color_pair | row_attr)
+            self.window.addstr(edit_y, 0, line_to_draw)
 
             # Move the cursor to the correct position (Screen x position)
-            # screen_cursor_x = (start_column of text) + (cursor_pos in text) - (text_scroll_offset)
-            screen_cursor_x = edit_x + (cursor_pos - display_start_col)
+            # screen_cursor_x = (start_column of text) + (cursor_pos in text - 1) - (text_scroll_offset)
+            screen_cursor_x = edit_x + (cursor_pos - 1 - display_start_col)
 
             self.window.move(edit_y, min(self.max_x - 1, screen_cursor_x))
             self.window.refresh()
@@ -390,20 +394,20 @@ class App:
                 break
             elif key in Keybinds.ENTER:
                 # Allow empty entries and lists
-                item.edit(new_text)
+                item.edit(new_text.lstrip())  # Strip leading space when saving
                 # If editing a list, make sure to reload the lists in case of sorting by name
                 if item_type == 'list':
                     self.data_store.getEntryLists()
                 break
             elif key in Keybinds.backspace:
-                if cursor_pos > 0:
+                if cursor_pos > 1:  # Prevent removing the leading space
                     new_text = new_text[:cursor_pos-1] + new_text[cursor_pos:]
                     cursor_pos -= 1
             elif key in Keybinds.delete:
                 if cursor_pos < len(new_text):
                     new_text = new_text[:cursor_pos] + new_text[cursor_pos+1:]
             elif key in Keybinds.ctrl_backspace:  # Delete word before cursor
-                if cursor_pos > 0:
+                if cursor_pos > 1:
                     word_start = cursor_pos - 1
                     # If we're in a word, skip back to start of word
                     if word_start >= 0 and new_text[word_start] != ' ':
@@ -413,7 +417,7 @@ class App:
                     while word_start > 0 and new_text[word_start - 1] == ' ':
                         word_start -= 1
                     new_text = new_text[:word_start] + new_text[cursor_pos:]
-                    cursor_pos = word_start
+                    cursor_pos = max(1, word_start)  # Don't go before the space
             elif key in Keybinds.ctrl_delete:  # Delete word at/after cursor
                 if cursor_pos < len(new_text):
                     word_end = cursor_pos
@@ -426,7 +430,7 @@ class App:
                     new_text = new_text[:cursor_pos] + new_text[word_end:]
             elif key in Keybinds.ctrlleft:
                 # Move cursor to start of previous word
-                if cursor_pos > 0:
+                if cursor_pos > 1:
                     new_pos = cursor_pos - 1
                     # Skip spaces before cursor
                     while new_pos > 0 and new_text[new_pos] == ' ':
@@ -434,7 +438,7 @@ class App:
                     # Skip word itself to reach its start
                     while new_pos > 0 and new_text[new_pos - 1] != ' ':
                         new_pos -= 1
-                    cursor_pos = new_pos
+                    cursor_pos = max(1, new_pos)  # Don't go before the space
             elif key in Keybinds.ctrlright:
                 # Move cursor to start of next word
                 if cursor_pos < len(new_text):
@@ -458,9 +462,9 @@ class App:
                         break
                 if remove > 0:
                     new_text = new_text[remove:]
-                    cursor_pos = max(0, cursor_pos - remove)
+                    cursor_pos = max(1, cursor_pos - remove)  # Don't go before the space
             elif key == c.KEY_LEFT:
-                cursor_pos = max(0, cursor_pos - 1)
+                cursor_pos = max(1, cursor_pos - 1)  # Don't go before the space
             elif key == c.KEY_RIGHT:
                 cursor_pos = min(len(new_text), cursor_pos + 1)
             elif 32 <= key <= 255: # Printable characters

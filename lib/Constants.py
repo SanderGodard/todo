@@ -20,7 +20,7 @@ class Keybinds:
     ADD = [97, 65, 43]      # a, A, +
     DELETE_ITEM = [100, 68] # d, D
     RENAME = [114, 82]      # r, R
-    EDIT = [101, 69, 105]   # e, E, i
+    EDIT = [101, 69, 105, 73]   # e, E, i, I
 
     # System
     QUIT = [113, 81, 120, 88, 24]   # q, Q, x, X, Ctrl+X
@@ -39,12 +39,12 @@ class Keybinds:
     DOWN_LEGACY = [336, 548]
     
     # Ctrl+Arrow keys for word navigation (multiple codes across terminals)
-    ctrlleft = [546, 544, 545, 543, 514, 393]  # Various terminal emulators
-    ctrlright = [561, 559, 560, 558, 516, 402]  # Various terminal emulators
+    ctrlleft = [546, 544, 545, 543, 514, 393, 554]  # Various terminal emulators
+    ctrlright = [561, 559, 560, 558, 516, 402, 569]  # Various terminal emulators
     
     # Word deletion keys
-    ctrl_backspace = [8, 23, 519, 127]  # Ctrl+Backspace, Ctrl+W, and variants
-    ctrl_delete = [520, 521, 528, 383]  # Ctrl+Delete and variants
+    ctrl_backspace = [8, 23, 519, 127, 263]  # Ctrl+Backspace, Ctrl+W, and variants
+    ctrl_delete = [520, 521, 383]  # Ctrl+Delete and variants
 
 
 class Flairs:
@@ -62,12 +62,12 @@ class Flairs:
 class FlairSymbols:
     # Symbols are padded with spaces for consistent display width
     convert = {
-        Flairs.tsk : "[ ] ",
-        Flairs.suc : "[+] ",
-        Flairs.err : "[x] ",
-        Flairs.gen : "[-] ",
-        Flairs.inf : "[i] ",
-        Flairs.prt : "[_] "
+        Flairs.tsk : "[*]",
+        Flairs.suc : "[+]",
+        Flairs.err : "[-]",
+        Flairs.gen : "[ ]",
+        Flairs.inf : "[i]",
+        Flairs.prt : "[_]"
     }
     
     # Use -1 for the background color to achieve transparency/default background
