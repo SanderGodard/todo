@@ -136,12 +136,28 @@ class Rendering:
     
     def _get_status_text(self, cursor_y, total_items):
         """Constructs the text for the bottom status bar."""
+        import datetime
         app = self.app
         # Prepare context variables for formatting
         if app.currentScreen == 0:
-            list_name = "MENU"
+            list_name = "MAIN"
+            last_edited = ""
         else:
             list_name = app.chosenEntryList.getName() if app.chosenEntryList else "Unknown"
+        # Compute last_edited
+        if app._get_selected_item_type() == 'list':
+            elist = app._get_selected_item()
+            if elist and elist.getEntries():
+                max_time = max(e.getTime() for e in elist.getEntries())
+                last_edited = datetime.datetime.fromtimestamp(max_time).strftime('%H:%M %d/%m/%Y')
+            else:
+                last_edited = "No entries"
+        else:  # entry
+            entry = app._get_selected_item()
+            if entry:
+                last_edited = datetime.datetime.fromtimestamp(entry.getTime()).strftime('%H:%M %d/%m/%Y')
+            else:
+                last_edited = ""
 
         storage_file = app.storage_path if app.storage_path else "~/.todo/storage.json"
         position = f"y: {cursor_y + 1}/{total_items}, x: {app.scroll_x}"
@@ -165,14 +181,15 @@ class Rendering:
         status_bar_color = color_map.get(color_name, c.COLOR_MAGENTA)
 
         # Default status format (can be overridden via config)
-        fmt = app.config.get('status_bar_format', " {storage_file} {divider} List: {list} {divider} {position} {divider} {keybinds}")
+        fmt = app.config.get('status_bar_format', " {storage_file} {divider} List: {list} {divider} {position} {divider} {last_edited} {divider} {keybinds}")
 
         status_line = fmt.format(
             divider=divider,
             list=list_name,
             storage_file=storage_file,
             keybinds=keybinds_hint,
-            position=position
+            position=position,
+            last_edited=last_edited
         )
 
         return status_line, status_bar_color

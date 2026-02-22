@@ -75,11 +75,11 @@ class App:
                 "# ~/.todo/config - simple KEY=VALUE pairs\n"
                 "# status_bar_color: color name (black, red, green, yellow, blue, magenta, cyan, white)\n"
                 "# divider: string used between status modules\n"
-                "# status_bar_format: python format string using {divider}, {list}, {storage_file}, {keybinds}, {position}\n"
+                "# status_bar_format: python format string using {divider}, {list}, {storage_file}, {keybinds}, {position}, {last_edited}\n"
                 "# Examples:\n"
                 "# status_bar_color=magenta\n"
                 "# divider=|\n"
-                "# status_bar_format= {list} {divider} {position} {divider} {storage_file} \n"
+                "# status_bar_format= {list} {divider} {position} {divider} {last_edited} {divider} {storage_file} \n"
             )
             try:
                 with open(conf_file, 'w') as fh:
@@ -104,7 +104,7 @@ class App:
         if 'divider' not in config:
             config['divider'] = '|'
         if 'status_bar_format' not in config:
-            config['status_bar_format'] = ' {list} {divider} {position} {divider} {storage_file} '
+            config['status_bar_format'] = ' {list} {divider} {position} {divider} {last_edited} {divider} {storage_file} '
         if 'status_bar_color' not in config:
             config['status_bar_color'] = 'magenta'
 

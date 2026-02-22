@@ -78,7 +78,7 @@ divider=;
 # Any char
 status_bar_format= {list} {divider} {position} {divider}
 # Available modules
-# {divider}, {list}, {storage_file}, {keybinds}, {position}
+# {divider}, {list}, {storage_file}, {keybinds}, {position}, {last_edited}
 ```
 
 #### Example
@@ -91,8 +91,8 @@ status_bar_color=white
 # divider: string used between status modules
 divider=|
 
-# status_bar_format: python format string using {divider}, {list}, {storage_file}, {keybinds}, {position}
-status_bar_format= {storage_file} {divider} List: {list} {divider} Pos: {position}
+# status_bar_format: python format string using {divider}, {list}, {storage_file}, {keybinds}, {position}, {last_edited}
+status_bar_format= {storage_file} {divider} List: {list} {divider} Pos: {position} {divider} Edited: {last_edited}
 ```
 
 ## Keybinds
