@@ -6,6 +6,16 @@ Now in **v2.0\***
 
 Small todo list program written in python 3 using the curses library
 
+## Overview
+Written in python, uses json to store and work with the data
+
+### Structure/Workflow
+
+1. List screen
+   - Running the program starts you in the list selction screen. Here you can choose to set up different todo-lists
+2. Entry screen
+   - After entering a list, you are able to easily manipulate entries, working as a functional todo-list
+
 ## Install
 ```sh
 curl https://raw.githubusercontent.com/SanderGodard/todo/refs/heads/main/install.sh | bash
@@ -17,39 +27,6 @@ git clone git@github.com:SanderGodard/todo.git
 cd todo
 sudo ln -s $(pwd)/todo.py /usr/bin/todo
 ```
-
-## Future work
-### Rofi integration
-A fully interactive rofi-based interface is available via `rofi_output.py`. Run it directly for a menu-driven todo manager:
-
-```bash
-python3 rofi_output.py
-```
-
-This provides:
-- Browse todo lists
-- View and manage entries
-- Add, edit, delete items
-- Interactive menus with rofi
-# Bind keys like Alt+a for add, Alt+e for edit, Alt+d for delete
-rofi -dmenu -p "Todo" -kb-accept-alt "Alt+Return" -kb-custom-1 "Alt+a" -kb-custom-2 "Alt+e" -kb-custom-3 "Alt+d" <<< $(./rofi_output.py -list 'Todo list')
-```
-
-## Overview
-Written in python, uses json to store and work with the data
-
-## Architecture
-
-### Main Entry Point
-- **Todo.py** - Main entry point that initializes the application, loads data, and starts the curses interface
-
-### Library Structure (lib/)
-- **App.py** - Main controller handling user input, navigation, and application state
-- **Constants.py** - All constants including Keybinds, Flairs, FlairSymbols, and ColorPairs
-- **DataStore.py** - Handles data persistence (the TodoParse class)
-- **Entry.py** - Individual task/entry model class
-- **EntryList.py** - Collection of entries (represents a single todo list)
-- **Rendering.py** - All visual output and screen rendering logic
 
 ## Running the Application
 ```bash
@@ -116,15 +93,15 @@ COMMON KEYBINDS (All Screens)
   L, Right              Navigate right (horizontal scrolling)
   J, S, Down            Move cursor down (wraps around)
   K, W, Up              Move cursor up (wraps around)
-  Home                  Jump to first list
-  End                   Jump to last list
+  Home                  Jump to first entry
+  End                   Jump to last entry
 
   Q, X, Esc, Ctrl+X     Go back (exit entry view or quit app)
 
   +, A                  Add a new entry at cursor
   D, Del, Backspace     Delete entry at cursor
 
-  R, E, I, Enter        Edit entry
+  R, E, I, Enter        Edit entry (See EDITING SCREEN for details)
 
 LIST SELECTION SCREEN (Screen 0)
 ─────────────────────────────────────────────────────────────────────────────
@@ -150,11 +127,43 @@ EDITING SCREEN (When editing entry/list text)
   Ctrl/Shift+Delete     Delete entire word at/after cursor
   Ctrl/Shift+Backspace  Delete entire word at/after cursor
 
-  Tab                   Insert 4 spaces at start of line
-  Shift+Tab             Remove up to 4 spaces from start of line
+  Tab                   Indent entry (add 4 spaces at start)
+  Shift+Tab             Unindent entry (remove up to 4 spaces from start)
 
   Enter, Ctrl+O         Save changes
   Esc, Ctrl+X           Cancel editing (revert changes)
 
 ═════════════════════════════════════════════════════════════════════════════
+```
+
+## Architecture
+
+### Main Entry Point
+- **Todo.py** - Main entry point that initializes the application, loads data, and starts the curses interface
+
+### Library Structure (lib/)
+- **App.py** - Main controller handling user input, navigation, and application state
+- **Constants.py** - All constants including Keybinds, Flairs, FlairSymbols, and ColorPairs
+- **DataStore.py** - Handles data persistence (the TodoParse class)
+- **Entry.py** - Individual task/entry model class
+- **EntryList.py** - Collection of entries (represents a single todo list)
+- **Rendering.py** - All visual output and screen rendering logic
+
+## Future work
+### Rofi integration
+A partially interactive rofi-based interface is available via `rofi_output.py`. Run it directly for a menu-driven todo manager:
+
+```bash
+python3 rofi_output.py
+```
+
+This provides:
+- Browse todo lists
+- View and manage entries
+- Add, edit, delete items
+- Interactive menus with rofi
+
+(Bind keys like Alt+a for add, Alt+e for edit, Alt+d for delete)
+```bash
+rofi -dmenu -p "Todo" -kb-accept-alt "Alt+Return" -kb-custom-1 "Alt+a" -kb-custom-2 "Alt+e" -kb-custom-3 "Alt+d" <<< $(./rofi_output.py -list 'Todo list')
 ```
