@@ -19,11 +19,20 @@ sudo ln -s $(pwd)/todo.py /usr/bin/todo
 ```
 
 ## Future work
-### Rofi integration possible?
-```bash
-rofi -no-laz-grab -sep "|" -dmenu -i -p 'Todo ' -mesg "$(./rofi_output.py -mesg)" <<< $(./rofi_output.py)
+### Rofi integration
+A fully interactive rofi-based interface is available via `rofi_output.py`. Run it directly for a menu-driven todo manager:
 
-rofi -no-laz-grab -sep "|" -dmenu -i -p 'Todo ' -mesg "$(./rofi_output.py -mesg)" <<< $(./rofi_output.py -list general)
+```bash
+python3 rofi_output.py
+```
+
+This provides:
+- Browse todo lists
+- View and manage entries
+- Add, edit, delete items
+- Interactive menus with rofi
+# Bind keys like Alt+a for add, Alt+e for edit, Alt+d for delete
+rofi -dmenu -p "Todo" -kb-accept-alt "Alt+Return" -kb-custom-1 "Alt+a" -kb-custom-2 "Alt+e" -kb-custom-3 "Alt+d" <<< $(./rofi_output.py -list 'Todo list')
 ```
 
 ## Overview

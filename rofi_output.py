@@ -1,8 +1,9 @@
 #!/bin/python3
+import subprocess
+import sys
 from os import path, mkdir
 from platform import system
 import json
-import argparse
 
 from lib.Constants import *
 from lib.Entry import *
@@ -14,11 +15,9 @@ class Todo:
         self.entryLists = []
         self.storage = None
 
-
     def createStorage(self):
-        if self.storage in locals() and not self.storage == None:
+        if hasattr(self, 'storage') and self.storage:
             return
-        # Define storage folder and file
         storageFileName = "storage.json"
         if system() == "Windows":
             import getpass
@@ -28,35 +27,31 @@ class Todo:
             try:
                 home = path.expanduser("~") + "/"
             except:
-                print(err + "Could not find home folder")
-                exit()
+                print("Could not find home folder")
+                sys.exit(1)
             confFolder = home + ".todo/"
             storage = confFolder + storageFileName
         else:
-            print("can't recognize OS, edit script to fit")
-            exit()
-        # Now validate that it is accessible
+            print("Unsupported OS")
+            sys.exit(1)
         if not path.exists(storage):
             if not path.exists(confFolder):
                 try:
                     mkdir(confFolder)
-                    print("Made directory: " + confFolder)
                 except:
                     print("Could not create directory: " + confFolder)
-                    exit()
+                    sys.exit(1)
             try:
                 with open(storage, "w") as file:
                     self.addEntryList()
-                    file.write(str(json.dumps(self.jsonify())))
-                print("Made file: " + storage)
+                    file.write(json.dumps(self.jsonify(), indent=4))
             except:
                 print("Could not create file: " + storage)
-                exit()
+                sys.exit(1)
         self.storage = storage
 
-
-    def addEntryList(self, entrylist=False):
-        if not entrylist is False:
+    def addEntryList(self, entrylist=None):
+        if entrylist:
             e = entrylist
         else:
             e = EntryList(parent=self)
@@ -64,21 +59,16 @@ class Todo:
         self.entryLists.append(e)
         return self.getEntryLists()[-1]
 
-
     def load(self):
         self.createStorage()
-        with open(self.storage, "r") as file:
-            try:
+        try:
+            with open(self.storage, "r") as file:
                 jsonObject = json.load(file)
-            except:
-                print(f"Try deleting {self.storage}, it may be corrupt")
-                exit()
+        except:
+            print(f"Corrupt storage file: {self.storage}")
+            sys.exit(1)
 
-        if len(str(jsonObject)) < 3:
-            self.addEntryList()
-            jsonObject = self.jsonify()
-
-        self.entryLists = [] # Start with clean slate, then generate objects based on the JSON
+        self.entryLists = []
         for k, v in jsonObject.items():
             eL = EntryList(self, name=k)
             for eDict in v:
@@ -87,87 +77,117 @@ class Todo:
             self.addEntryList(eL)
         return self.getEntryLists()
 
-
     def jsonify(self):
         jsonObject = {}
         for eL in self.getEntryLists():
-            jsonObject[eL] = []
-            for l in eL.getEntries():
-                jsonObject[eL].append(l.jsonify())
+            jsonObject[str(eL)] = []
+            for e in eL.getEntries():
+                jsonObject[str(eL)].append(e.json())
         return jsonObject
-
 
     def save(self):
         with open(self.storage, "w") as file:
-            file.write(str(json.dumps(self.jsonify(), indent=4)))
-
+            file.write(json.dumps(self.jsonify(), indent=4))
 
     def getEntryLists(self):
         return self.entryLists
 
-
     def __repr__(self):
-        return f"Todo(entryLists={len(self.entryLists)}, {self.storage=})"
+        return f"Todo({len(self.entryLists)} lists)"
 
-## New function for argument parsing
-def parse_args():
-	"""Configures and runs the argument parser."""
-	parser = argparse.ArgumentParser(description="A simple command-line todo application.")
 
-	# 1. Argument for displaying the Todo object's __repr__
-	parser.add_argument(
-		'-mesg', '-m',
-		action='store_true',
-		help='Display the full Todo object representation before listing entries.'
-	)
+def rofi_menu(options, prompt="Select", mesg=""):
+    """Display a rofi menu and return the selected option."""
+    if not options:
+        return None
+    
+    input_str = "\n".join(options)
+    
+    cmd = ["rofi", "-dmenu", "-p", prompt, "-i"]
+    if mesg:
+        cmd.extend(["-mesg", mesg])
+    
+    try:
+        result = subprocess.run(cmd, input=input_str, text=True, capture_output=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+        else:
+            return None
+    except FileNotFoundError:
+        print("Error: rofi not installed")
+        sys.exit(1)
 
-	# 2. Argument for listing entries of a specific list
-	parser.add_argument(
-		'-list', '-l',
-		type=str,
-		metavar='<EntryList Name>',
-		help='Specify the name of an EntryList whose entries should be displayed.'
-	)
-
-	return parser.parse_args()
 
 def main():
-	args = parse_args()
-
-	todo = Todo()
-	todo.load()
-
-	if args.mesg:
-		print(todo) # Print the Todo object's __repr__
-		exit()
-	# Determine which list to detail
-	target_list_name = args.list
-	
-	for eL in todo.getEntryLists():
-		# Print the EntryList summary
-		# Note: I'm assuming the desired output format is '| [ ] List Name'
-		if target_list_name == "":
-			print("[ ]", eL, end="|")
-
-		# Check if the current EntryList matches the one specified by "-list"
-		# If no list is specified (target_list_name is None), no entries are shown.
-		# If a list is specified, only show entries for the matching list.
-		if target_list_name and eL.name == target_list_name:
-			# Show the entries for the specified list
-			for e in eL.getEntries():
-				# Note: Assuming 'e.flair' is an index into FlairSymbols.convert
-				flair_symbol = FlairSymbols.convert.get(e.getFlair(), "[?]") # Use .get for safety
-				print(flair_symbol, e.getText(), end="|")
-
-
-	# Only show EntryLists normally
-#    for eL in todo.getEntryLists():
- #       print("|", "[ ]", eL, end="")
-		# if current eL is the "-list <eL>" in args, show its entries
-  #      for e in eL.getEntries():
-   #         print("|",FlairSymbols.convert[e.flair], e, end="")
-
-
+    todo = Todo()
+    todo.load()
+    
+    current_list = None
+    
+    while True:
+        if current_list is None:
+            # Main menu: list of lists
+            options = ["[Add New List]"]
+            for el in todo.getEntryLists():
+                options.append(f"[ ] {el.name}")
+            
+            mesg = f"Todo: {len(todo.getEntryLists())} lists"
+            selection = rofi_menu(options, "Todo Lists", mesg)
+            
+            if not selection:
+                break
+            elif selection == "[Add New List]":
+                new_name = rofi_menu([""], "New List Name")
+                if new_name and new_name.strip():
+                    todo.addEntryList(EntryList(todo, name=new_name.strip()))
+                    todo.save()
+            else:
+                list_name = selection[4:]  # Remove "[ ] "
+                current_list = next((el for el in todo.getEntryLists() if el.name == list_name), None)
+        else:
+            # List menu: entries in current list
+            options = ["[Back to Lists]", "[Add New Entry]"]
+            for e in current_list.getEntries():
+                flair_symbol = FlairSymbols.convert.get(e.getFlair(), "[?]")
+                options.append(f"{flair_symbol} {e.getText()}")
+            
+            mesg = f"List: {current_list.name} ({len(current_list.getEntries())} entries)"
+            selection = rofi_menu(options, f"Entries in {current_list.name}", mesg)
+            
+            if not selection:
+                break
+            elif selection == "[Back to Lists]":
+                current_list = None
+            elif selection == "[Add New Entry]":
+                new_text = rofi_menu([""], "New Entry Text")
+                if new_text and new_text.strip():
+                    current_list.addEntry(Entry(current_list, text=new_text.strip()))
+                    todo.save()
+            else:
+                # Entry selected, show actions
+                flair_symbol = selection[:3]
+                entry_text = selection[4:]
+                entry = next((e for e in current_list.getEntries() 
+                             if FlairSymbols.convert.get(e.getFlair(), "[?]") == flair_symbol 
+                             and e.getText() == entry_text), None)
+                
+                if entry:
+                    action_options = ["Edit", "Delete", "Flip Flair", "Cancel"]
+                    action = rofi_menu(action_options, f"Action for: {entry_text}")
+                    
+                    if action == "Edit":
+                        new_text = rofi_menu([entry.getText()], "Edit Entry")
+                        if new_text and new_text.strip() and new_text != entry.getText():
+                            entry.edit(new_text.strip())
+                            todo.save()
+                    elif action == "Delete":
+                        confirm = rofi_menu(["No", "Yes"], "Confirm Delete", f"Delete '{entry_text}'?")
+                        if confirm == "Yes":
+                            entry.delete()
+                            todo.save()
+                    elif action == "Flip Flair":
+                        entry.flip()
+                        todo.save()
 
 
 if __name__ == "__main__":
